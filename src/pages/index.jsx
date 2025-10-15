@@ -12,8 +12,6 @@ import RequestMarket from "./RequestMarket";
 
 import LearnMore from "./LearnMore";
 
-import LiveAuction from "./LiveAuction";
-
 import AllMarkets from "./AllMarkets";
 
 import Admin from "./Admin";
@@ -33,8 +31,6 @@ const PAGES = {
     RequestMarket: RequestMarket,
     
     LearnMore: LearnMore,
-    
-    LiveAuction: LiveAuction,
     
     AllMarkets: AllMarkets,
     
@@ -78,8 +74,6 @@ function PagesContent() {
                 <Route path="/RequestMarket" element={<RequestMarket />} />
                 
                 <Route path="/LearnMore" element={<LearnMore />} />
-                
-                <Route path="/LiveAuction" element={<LiveAuction />} />
                 
                 <Route path="/AllMarkets" element={<AllMarkets />} />
                 

@@ -197,88 +197,6 @@ export default function MarketsPage() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         
-        {/* Exchange Hours - Modern Timeline */}
-        <motion.div 
-          className="mb-16"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <div className="bg-white/90 backdrop-blur-md border-2 border-[#A97142]/20 rounded-3xl p-8 shadow-2xl">
-            <div className="flex items-center gap-3 mb-8">
-              <Clock className="w-7 h-7 text-[#A97142]" />
-              <h2 className="text-3xl font-bold text-[#4E3629]">Exchange Hours</h2>
-            </div>
-            
-            <div className="relative">
-              {/* Timeline Connector */}
-              <div className="absolute left-[47px] top-[80px] bottom-[80px] w-1 bg-gradient-to-b from-blue-400 to-green-400 hidden md:block" />
-              
-              <div className="grid md:grid-cols-2 gap-8">
-                {/* Auction Period */}
-                <Link to={createPageUrl("LiveAuction")} className="block">
-                  <motion.div
-                    whileHover={{ scale: 1.02, y: -5 }}
-                    transition={{ duration: 0.2 }}
-                    className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-300 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer group relative overflow-hidden"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-400/0 to-blue-400/10 group-hover:from-blue-400/10 group-hover:to-blue-400/20 transition-all duration-300" />
-                    
-                    <div className="relative z-10">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
-                          <CalendarIcon className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="text-xl font-bold text-[#4E3629]">Auction Period</h3>
-                          <Badge className="bg-blue-500 text-white mt-1">Opening</Badge>
-                        </div>
-                      </div>
-                      
-                      <p className="text-4xl font-black text-blue-600 mb-3">9:00 AM - 12:00 PM</p>
-                      <p className="text-[#4E3629]/70 mb-4">Place your initial orders during the opening auction</p>
-                      
-                      <div className="flex items-center text-[#A97142] font-semibold group-hover:translate-x-2 transition-transform">
-                        Click to join live auction
-                        <ArrowRight className="w-4 h-4 ml-2" />
-                      </div>
-                    </div>
-                  </motion.div>
-                </Link>
-                
-                {/* Live Exchange */}
-                <motion.div
-                  whileHover={{ scale: 1.02, y: -5 }}
-                  transition={{ duration: 0.2 }}
-                  className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border-2 border-green-300 shadow-lg hover:shadow-2xl transition-all duration-300 relative overflow-hidden"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-green-400/0 to-green-400/10 transition-all duration-300" />
-                  
-                  <div className="relative z-10">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
-                        <TrendingUp className="w-6 h-6 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-[#4E3629]">Live Exchange</h3>
-                        <Badge className="bg-green-500 text-white mt-1">Active</Badge>
-                      </div>
-                    </div>
-                    
-                    <p className="text-4xl font-black text-green-600 mb-3">12:15 PM - 5:00 PM</p>
-                    <p className="text-[#4E3629]/70 mb-4">Continuous trading with real-time order matching</p>
-                    
-                    <div className="flex items-center gap-2 text-sm text-[#4E3629]/60">
-                      <BarChart3 className="w-4 h-4" />
-                      <span>{activeMarkets.length} active markets • ${totalVolume.toLocaleString()} volume</span>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
         {/* Featured Markets */}
         <FeaturedMarkets featuredMarkets={featuredMarkets} />
 
@@ -373,7 +291,6 @@ export default function MarketsPage() {
               <h4 className="text-[#FAF3E0] font-bold mb-4">Markets</h4>
               <ul className="space-y-2 text-[#FAF3E0]/70 text-sm">
                 <li><Link to={createPageUrl("Markets")} className="hover:text-[#A97142] transition">Browse All</Link></li>
-                <li><Link to={createPageUrl("LiveAuction")} className="hover:text-[#A97142] transition">Live Auction</Link></li>
                 <li><Link to={createPageUrl("RequestMarket")} className="hover:text-[#A97142] transition">Request Market</Link></li>
               </ul>
             </div>

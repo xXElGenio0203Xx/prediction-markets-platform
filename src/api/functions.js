@@ -63,3 +63,11 @@ export const migratePositionsEntryPrice = base44.functions.migratePositionsEntry
 
 export const portfolioMathSelfTest = base44.functions.portfolioMathSelfTest;
 
+export const getFeeConfig = base44.functions.getFeeConfig;
+
+export const ensureFeesTreasury = base44.functions.ensureFeesTreasury;
+
+export const applyClobFees = base44.functions.applyClobFees;
+
+export const getFeesSummary = base44.functions.getFeesSummary;
+

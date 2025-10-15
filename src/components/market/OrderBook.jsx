@@ -1,12 +1,36 @@
 
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { BookOpen, TrendingUp, TrendingDown } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+// New helpers for CLOB
+function deriveAsksFromNoBids(orders) {
+  const noBids = orders.filter(o => o.side === 'NO_BID' && (o.qty_open || 0) > 0);
+  const map = new Map();
+  for (const o of noBids) {
+    const askP = Math.round((1 - Number(o.price)) * 100) / 100;
+    const key = askP.toFixed(2);
+    map.set(key, (map.get(key) || 0) + Number(o.qty_open || 0));
+  }
+  return Array.from(map.entries()).map(([price, totalQuantity]) => ({ price: Number(price), totalQuantity }))
+    .sort((a, b) => a.price - b.price);
+}
+
+function deriveYesBids(orders) {
+  const yesBids = orders.filter(o => o.side === 'YES_BID' && (o.qty_open || 0) > 0);
+  const map = new Map();
+  for (const o of yesBids) {
+    const p = Math.round(Number(o.price) * 100) / 100;
+    const key = p.toFixed(2);
+    map.set(key, (map.get(key) || 0) + Number(o.qty_open || 0));
+  }
+  return Array.from(map.entries()).map(([price, totalQuantity]) => ({ price: Number(price), totalQuantity }))
+    .sort((a, b) => b.price - a.price);
+}
+
 const OrderRow = ({ order, maxQuantity, isAsk }) => {
-  const percentage = (order.totalQuantity / maxQuantity) * 100;
+  const percentage = maxQuantity ? (order.totalQuantity / maxQuantity) * 100 : 0;
   return (
     <div className="relative flex items-center justify-between text-sm py-2.5 px-3 rounded-lg hover:bg-[#4E3629]/5 transition-colors">
       <motion.div
@@ -25,75 +49,47 @@ const OrderRow = ({ order, maxQuantity, isAsk }) => {
   );
 };
 
-export default function OrderBook({ orders, selectedOutcome, onUpdate }) {
-  const aggregateOrders = (orders, side, outcome) => {
-    const relevantOrders = orders.filter(o => o.status === 'open' && o.side === side && o.outcome === outcome);
+export default function OrderBook({ orders }) {
+  const asks = deriveAsksFromNoBids(orders || []);
+  const bids = deriveYesBids(orders || []);
+  const all = [...asks, ...bids];
+  const maxQuantity = all.length ? Math.max(...all.map(o => o.totalQuantity)) : 1;
+  const bestBid = bids[0]?.price ?? 0;
+  const bestAsk = asks[0]?.price ?? 1;
+  const spread = Math.max(0, bestAsk - bestBid);
 
-    const aggregated = relevantOrders.reduce((acc, order) => {
-        const key = `${order.price}`;
-        
-        if (!acc[key]) {
-            acc[key] = {
-                price: order.price,
-                totalQuantity: 0,
-            };
-        }
-        
-        acc[key].totalQuantity += order.quantity - (order.filled_quantity || 0);
-        
-        return acc;
-    }, {});
-    
-    return Object.values(aggregated).sort((a, b) => {
-        return side === 'buy' ? b.price - a.price : a.price - b.price;
-    });
-  };
-
-  const buyOrders = aggregateOrders(orders, 'buy', selectedOutcome);
-  const sellOrders = aggregateOrders(orders, 'sell', selectedOutcome);
-
-  const allOpenOrders = [...buyOrders, ...sellOrders];
-  const maxQuantity = Math.max(...allOpenOrders.map(o => o.totalQuantity), 1);
-
-  const bestBid = buyOrders.length > 0 ? buyOrders[0].price : 0;
-  const bestAsk = sellOrders.length > 0 ? sellOrders[0].price : 1;
-  const spread = bestAsk - bestBid > 0 ? bestAsk - bestBid : 0;
-
-  // Listen for external updates
   useEffect(() => {
-    if (onUpdate) {
-      onUpdate();
-    }
-  }, [orders, onUpdate]); // Added onUpdate to dependency array to satisfy ESLint hook dependency rules
+    // This useEffect is kept as a placeholder as per the outline.
+    // If no specific side effects are needed for 'orders' updates, it can be removed.
+  }, [orders]);
 
   return (
     <Card className="bg-white/80 backdrop-blur-sm border-2 border-[#4E3629]/10 shadow-lg rounded-2xl overflow-hidden">
       <CardHeader className="border-b border-[#4E3629]/5 bg-gradient-to-r from-[#FAF3E0] to-[#F5EED8]">
         <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#4E3629]">
           <BookOpen className="w-5 h-5 text-[#A97142]" />
-          Order Book
+          Order Book (YES)
         </CardTitle>
-        <p className="text-xs text-[#4E3629]/60 mt-1">Live orders for {selectedOutcome.toUpperCase()}</p>
+        <p className="text-xs text-[#4E3629]/60 mt-1">YES bids vs. derived YES asks (from NO bids)</p>
       </CardHeader>
       <CardContent className="p-4">
         <div className="space-y-4">
-          {/* Header */}
           <div className="flex justify-between items-center text-xs font-bold text-[#4E3629]/50 pb-2 border-b border-[#4E3629]/10">
             <span>PRICE</span>
             <span>SIZE</span>
           </div>
 
-          {/* Sell Orders (Asks) */}
+          {/* Asks */}
           <div className="space-y-1">
-            {sellOrders.length > 0 ? (
-              sellOrders.slice(0, 5).map((order, index) => (
-                <OrderRow key={`sell-${index}`} order={order} maxQuantity={maxQuantity} isAsk={true} />
+            {asks.length > 0 ? (
+              asks.slice(0, 5).map((order, index) => (
+                <OrderRow key={`ask-${index}`} order={order} maxQuantity={maxQuantity} isAsk={true} />
               ))
             ) : (
-              <p className="text-sm text-[#4E3629]/40 py-3 text-center">No sell orders</p>
+              <p className="text-sm text-[#4E3629]/40 py-3 text-center">No asks</p>
             )}
           </div>
-          
+
           {/* Spread */}
           <div className="py-3 text-center border-y-2 border-[#A97142]/20 bg-gradient-to-r from-[#A97142]/5 to-[#50C878]/5 rounded-lg">
             <div className="text-base font-bold text-[#4E3629]">
@@ -103,21 +99,20 @@ export default function OrderBook({ orders, selectedOutcome, onUpdate }) {
               Spread: ${spread.toFixed(2)}
             </div>
           </div>
-          
-          {/* Buy Orders (Bids) */}
+
+          {/* Bids */}
           <div className="space-y-1">
-            {buyOrders.length > 0 ? (
-              buyOrders.slice(0, 5).map((order, index) => (
-                <OrderRow key={`buy-${index}`} order={order} maxQuantity={maxQuantity} isAsk={false} />
+            {bids.length > 0 ? (
+              bids.slice(0, 5).map((order, index) => (
+                <OrderRow key={`bid-${index}`} order={order} maxQuantity={maxQuantity} isAsk={false} />
               ))
             ) : (
-              <p className="text-sm text-[#4E3629]/40 py-3 text-center">No buy orders</p>
+              <p className="text-sm text-[#4E3629]/40 py-3 text-center">No bids</p>
             )}
           </div>
 
-          {/* Stats */}
           <div className="pt-3 border-t border-[#4E3629]/10 text-xs text-[#4E3629]/50">
-            <p>{allOpenOrders.length} open orders</p>
+            <p>{(asks.length + bids.length)} levels shown</p>
           </div>
         </div>
       </CardContent>

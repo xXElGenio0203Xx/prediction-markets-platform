@@ -132,16 +132,15 @@ export default function Layout({ children, currentPageName }) {
     }
   };
 
-  // Check if we're on the Markets homepage or Live Auction
+  // Check if we're on the Markets homepage
   const isMarketsPage = location.pathname === createPageUrl("Markets");
-  const isLiveAuctionPage = location.pathname === createPageUrl("LiveAuction");
   const isLearnMorePage = location.pathname === createPageUrl("LearnMore");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FAF3E0] via-[#F5EED8] to-[#E8DCC8] relative">
       
-      {/* Money Fall Animation - on Markets and Live Auction pages */}
-      {(isMarketsPage || isLiveAuctionPage) && (
+      {/* Money Fall Animation - on Markets page */}
+      {(isMarketsPage) && (
         <div className="fixed inset-0 z-[15] pointer-events-none">
           <MoneyFall duration={60000} /> {/* Added duration prop */}
         </div>
@@ -347,7 +346,6 @@ export default function Layout({ children, currentPageName }) {
               <ul className="space-y-2 text-[#FAF3E0]/70 text-sm">
                 <li><Link to={createPageUrl("Markets")} className="hover:text-[#A97142] transition">Browse All</Link></li>
                 <li><Link to={createPageUrl("AllMarkets")} className="hover:text-[#A97142] transition">All Markets</Link></li>
-                <li><Link to={createPageUrl("LiveAuction")} className="hover:text-[#A97142] transition">Live Auction</Link></li>
                 <li><Link to={createPageUrl("RequestMarket")} className="hover:text-[#A97142] transition">Request Market</Link></li>
               </ul>
             </div>

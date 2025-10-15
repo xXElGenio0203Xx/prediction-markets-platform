@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-// Removed: import { placeOrder } from "@/api/functions"; // Will be dynamically imported
+import { base44 } from "@/api/base44Client";
 
 export default function TradeWidget({ market, user, onOrderPlaced, selectedOutcome, onOutcomeChange }) {
   const [probability, setProbability] = useState(50); // Represents price as a percentage
@@ -30,6 +30,7 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
   const [currentUser, setCurrentUser] = useState(null);
   const [userPositions, setUserPositions] = useState([]);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, side: null });
+  const [feeCfg, setFeeCfg] = useState({ maker_bps: 0, taker_bps: 0, per_contract_fee: 0 }); // ADDED: fee config state
 
   // Fetch fresh user on mount and whenever an order is placed to refresh Bruno Dollars
   useEffect(() => {
@@ -64,6 +65,25 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
     loadPositions();
   }, [currentUser, market.id, lastOrderStatus]); // Reload positions when user changes, market changes, or an order status updates
 
+  // ADDED: fetch fee config for estimate
+  useEffect(() => {
+    let cancelled = false;
+    async function loadFeeCfg() {
+      try {
+        if (!market?.id) return;
+        const { data } = await base44.functions.invoke('getFeeConfig', { market_id: market.id });
+        if (!cancelled) {
+          setFeeCfg(data?.config || { maker_bps: 0, taker_bps: 0, per_contract_fee: 0 });
+        }
+      } catch (error) {
+        console.error("Failed to fetch fee config:", error);
+        if (!cancelled) setFeeCfg({ maker_bps: 0, taker_bps: 0, per_contract_fee: 0 });
+      }
+    }
+    loadFeeCfg();
+    return () => { cancelled = true; };
+  }, [market?.id]);
+
   // Calculate total contracts in this market (absolute value of shares for both YES/NO)
   const totalContracts = userPositions.reduce((sum, p) => sum + Math.abs(p.shares), 0);
   const remainingCapacity = Math.max(0, 100 - totalContracts); // Max 100 contracts per market
@@ -75,10 +95,21 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
   const potentialPayout = numQuantity.toFixed(2); // Payout is always 1 per contract if correct
   const expectedProfit = (parseFloat(potentialPayout) - parseFloat(cost)).toFixed(2);
 
+  // Helper to estimate taker fee shown to user
+  const estimatedFee = (() => {
+    const q = numQuantity;
+    if (!q || q <= 0) return 0;
+    const notional = price * q;
+    const takerPerc = (feeCfg.taker_bps || 0) / 10000 * notional;
+    const perSide = (feeCfg.per_contract_fee || 0) * q;
+    return (Math.round((takerPerc + perSide + Number.EPSILON) * 100) / 100);
+  })();
+
   // Check if user can trade
   const canTrade = currentUser && currentUser.email && currentUser.email.toLowerCase().endsWith('@brown.edu');
   const userCash = currentUser?.bruno_dollars || 0;
-  const hasEnoughCash = userCash >= parseFloat(cost);
+  // UPDATED: hasEnoughCash now considers estimated fees
+  const hasEnoughCash = userCash >= (parseFloat(cost) + estimatedFee);
   const withinLimit = numQuantity <= remainingCapacity;
 
   // Get available shares for selling the selected outcome
@@ -164,6 +195,21 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
               }
             } catch (marketError) {
               console.log("Could not update market:", marketError);
+            }
+
+            // ADDED: APPLY FEES FOR THIS EXECUTION
+            try {
+              await base44.functions.invoke('applyClobFees', {
+                market_id: newOrder.market_id,
+                price: executionPrice,
+                quantity: executableQuantity,
+                buy_user_id: newOrder.side === 'buy' ? newOrder.user_id : matchingOrder.user_id,
+                sell_user_id: newOrder.side === 'sell' ? newOrder.user_id : matchingOrder.user_id,
+                resting_side: matchingOrder.side.toUpperCase(),
+                trade_id: newOrder.id // Using newOrder.id as the trade ID
+              });
+            } catch (feeErr) {
+              console.log("Fee application failed (non-blocking):", feeErr?.response?.data || feeErr.message);
             }
 
             executions.push({
@@ -281,6 +327,7 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
       return;
     }
 
+    // UPDATED: hasEnoughCash already includes fees
     if (side === 'buy' && (!hasEnoughCash || !withinLimit)) {
         setLastOrderStatus({ type: 'error', message: 'Cannot place buy order: Insufficient funds or exceeding contract limit.' });
         return;
@@ -579,6 +626,18 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
                   <span className="text-[#4E3629]/60">Cost</span>
                   <span className="font-bold text-[#4E3629] text-lg">${cost}</span>
                 </div>
+                {/* ADDED: Estimated Fees and You Pay Now */}
+                <div className="flex justify-between items-center">
+                  <span className="text-[#4E3629]/60">Estimated Fees (taker)</span>
+                  <span className="font-semibold text-[#4E3629]">${estimatedFee.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t-2 border-[#A97142]/20">
+                  <span className="text-[#4E3629]/60">You Pay Now</span>
+                  <span className="font-bold text-[#4E3629] text-lg">
+                    ${(parseFloat(cost) + estimatedFee).toFixed(2)}
+                  </span>
+                </div>
+                {/* END ADDED */}
                 <div className="flex justify-between items-center">
                   <span className="text-[#4E3629]/60">Potential Payout (if correct)</span>
                   <span className="font-semibold text-[#50C878]">${potentialPayout}</span>
@@ -612,7 +671,7 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
                 <div className="mt-3 p-3 bg-[#E34234]/10 border border-[#E34234]/30 rounded-lg flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-[#E34234]" />
                   <p className="text-xs text-[#E34234] font-medium">
-                    ⚠️ You don't have enough Bruno Dollars to place this trade.
+                    ⚠️ You don't have enough Bruno Dollars to place this trade (including estimated fees).
                   </p>
                 </div>
               )}
@@ -702,6 +761,14 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
                   <p className="font-bold text-[#4E3629]">${cost}</p>
                 </div>
                 <div>
+                  <p className="text-[#4E3629]/60">Estimated Fees:</p>
+                  <p className="font-bold text-[#4E3629]">${estimatedFee.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-[#4E3629]/60">Total Pay Now:</p>
+                  <p className="font-bold text-[#4E3629]">${(parseFloat(cost) + estimatedFee).toFixed(2)}</p>
+                </div>
+                <div>
                   <p className="text-[#4E3629]/60">Potential Payout:</p>
                   <p className="font-bold text-[#50C878]">${potentialPayout}</p>
                 </div>
@@ -715,7 +782,7 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
             </div>
 
             <div className="text-xs text-[#4E3629]/60 space-y-1">
-              <p>• You will pay ${cost} now</p>
+              <p>• You will pay ${(parseFloat(cost) + estimatedFee).toFixed(2)} now (including estimated fees)</p>
               <p>• If {selectedOutcome.toUpperCase()} wins, you'll receive ${potentialPayout}</p>
               <p>• If {selectedOutcome.toUpperCase()} loses, you'll receive $0</p>
             </div>

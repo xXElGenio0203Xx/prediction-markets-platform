@@ -9,11 +9,15 @@ export const Position = base44.entities.Position;
 
 export const MarketRequest = base44.entities.MarketRequest;
 
-export const AuctionOrder = base44.entities.AuctionOrder;
-
 export const Transaction = base44.entities.Transaction;
 
 export const SystemConfig = base44.entities.SystemConfig;
+
+export const FeeEvent = base44.entities.FeeEvent;
+
+export const SystemWallet = base44.entities.SystemWallet;
+
+export const Trade = base44.entities.Trade;
 
 
 

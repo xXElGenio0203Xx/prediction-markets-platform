@@ -13,10 +13,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { 
-  Shield, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Shield,
+  CheckCircle,
+  XCircle,
   Calendar,
   AlertCircle,
   TrendingUp,
@@ -24,14 +24,18 @@ import {
   DollarSign,
   Activity,
   Search,
-  ArrowUpDown
+  ArrowUpDown,
+  DollarSign as Dollar,
+  PiggyBank
 } from "lucide-react";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { resolveMarket } from "@/api/functions";
 import { validateSystemBalance } from "@/api/functions";
-import { systemHealthCheck } from "@/api/functions"; // Import new function
-import { adminResetBalances } from "@/api/functions"; // Import new function
+import { systemHealthCheck } from "@/api/functions";
+import { adminResetBalances } from "@/api/functions";
+import { base44 } from "@/api/base44Client";
+import FeesTile from "../components/admin/FeesTile"; // Added import
 
 export default function AdminPage({ user }) {
   const [markets, setMarkets] = useState([]);
@@ -47,11 +51,13 @@ export default function AdminPage({ user }) {
   const [selectedMarketFilter, setSelectedMarketFilter] = useState('all');
   const [sortBy, setSortBy] = useState('value_locked'); // 'value_locked', 'shares', 'user_id', 'market_title', 'unrealized_pnl'
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
-  
+
   // New state variables for balance reset and health check
   const [healthCheck, setHealthCheck] = useState(null);
   const [isResettingBalances, setIsResettingBalances] = useState(false);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+
+  // feesSummary state is removed as FeesTile will manage its own data
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -61,6 +67,8 @@ export default function AdminPage({ user }) {
     loadSystemBalance();
     loadEconomyValidation();
     loadSystemHealth(); // Load system health on mount
+
+    // Removed fees summary loading logic as FeesTile will handle it internally
   }, [user]);
 
   // New useEffect to apply filters and sorting whenever positions or filter criteria change
@@ -85,7 +93,7 @@ export default function AdminPage({ user }) {
       // Access the data property from the axios response
       const data = response.data || response;
       setSystemBalance(data);
-      
+
       // Extract and store open positions
       if (data?.positions?.detailed_positions) {
         setOpenPositions(data.positions.detailed_positions);
@@ -141,15 +149,15 @@ export default function AdminPage({ user }) {
     try {
       const response = await adminResetBalances({});
       const result = response.data || response;
-      
+
       if (result.success) {
         alert(`✅ Balance reset complete!\n\n` +
-              `Users processed: ${result.summary.total_users_processed}\n` +
-              `Negatives fixed: ${result.summary.negatives_fixed}\n` +
-              `Overcaps fixed: ${result.summary.overcap_fixed}\n` +
-              `Balances reset: ${result.summary.balances_reset}\n\n` +
-              `System ${result.system_integrity.is_balanced ? '✅ BALANCED' : '⚠️ IMBALANCED'}`);
-        
+          `Users processed: ${result.summary.total_users_processed}\n` +
+          `Negatives fixed: ${result.summary.negatives_fixed}\n` +
+          `Overcaps fixed: ${result.summary.overcap_fixed}\n` +
+          `Balances reset: ${result.summary.balances_reset}\n\n` +
+          `System ${result.system_integrity.is_balanced ? '✅ BALANCED' : '⚠️ IMBALANCED'}`);
+
         await loadSystemBalance();
         await loadEconomyValidation();
         await loadSystemHealth();
@@ -177,7 +185,7 @@ export default function AdminPage({ user }) {
     // Apply search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(p => 
+      filtered = filtered.filter(p =>
         p.user_id.toLowerCase().includes(query) ||
         p.market_title.toLowerCase().includes(query)
       );
@@ -191,7 +199,7 @@ export default function AdminPage({ user }) {
     // Apply sorting
     filtered.sort((a, b) => {
       let aVal, bVal;
-      
+
       switch (sortBy) {
         case 'value_locked':
           aVal = a.value_locked;
@@ -219,7 +227,7 @@ export default function AdminPage({ user }) {
       }
 
       if (typeof aVal === 'string') {
-        return sortOrder === 'asc' 
+        return sortOrder === 'asc'
           ? aVal.localeCompare(bVal)
           : bVal.localeCompare(aVal);
       }
@@ -250,22 +258,22 @@ export default function AdminPage({ user }) {
     setResolvingMarket(market.id);
 
     try {
-      const response = await resolveMarket({ 
-        market_id: market.id, 
-        outcome: outcome 
+      const response = await resolveMarket({
+        market_id: market.id,
+        outcome: outcome
       });
-      
+
       // Access the data property from the axios response
       const result = response.data || response;
-      
+
       if (result.success) {
         alert(`✅ Market resolved successfully!\n\n` +
-              `Winning Outcome: ${result.summary.winning_outcome}\n` +
-              `Winners Paid: ${result.payouts.winners_count}\n` +
-              `Total Payout: $${result.payouts.total_payout.toFixed(2)}\n` +
-              `Orders Refunded: ${result.refunds.refund_count} ($${result.refunds.total_refunded.toFixed(2)})`);
+          `Winning Outcome: ${result.summary.winning_outcome}\n` +
+          `Winners Paid: ${result.payouts.winners_count}\n` +
+          `Total Payout: $${result.payouts.total_payout.toFixed(2)}\n` +
+          `Orders Refunded: ${result.refunds.refund_count} ($${result.refunds.total_refunded.toFixed(2)})`);
       }
-      
+
       await loadMarkets();
       await loadSystemBalance(); // Reload system balance to update positions after resolution
       await loadEconomyValidation(); // Reload economy validation after resolution
@@ -274,7 +282,7 @@ export default function AdminPage({ user }) {
       console.error("Error resolving market:", error);
       alert(`❌ Failed to resolve market: ${error.message}`);
     }
-    
+
     setResolvingMarket(null);
   };
 
@@ -389,6 +397,12 @@ export default function AdminPage({ user }) {
               </div>
             </CardContent>
           </Card>
+          {/* The Fees YTD card was removed from here */}
+        </div>
+
+        {/* FeesTile component added as a standalone block */}
+        <div className="mb-6">
+          <FeesTile />
         </div>
 
         {/* System Health Card */}
@@ -425,8 +439,8 @@ export default function AdminPage({ user }) {
             <CardContent className="space-y-6">
               {/* Status Badge */}
               <div className="flex items-center gap-3">
-                <Badge className={healthCheck.status === 'HEALTHY' ? 
-                  "bg-green-600 text-white text-lg px-6 py-2" : 
+                <Badge className={healthCheck.status === 'HEALTHY' ?
+                  "bg-green-600 text-white text-lg px-6 py-2" :
                   "bg-red-600 text-white text-lg px-6 py-2"
                 }>
                   {healthCheck.status === 'HEALTHY' ? '✅ SYSTEM HEALTHY' : '⚠️ ISSUES DETECTED'}
@@ -444,12 +458,12 @@ export default function AdminPage({ user }) {
                   <div className="bg-[#2A1F1A]/50 p-4 rounded-lg">
                     <p className="text-[#FAF3E0]/60 text-xs mb-1">Total Cash</p>
                     <p className="text-2xl font-bold text-[#CD853F]">
-                      ${typeof healthCheck.economy.total_cash_in_circulation === 'number' 
+                      ${typeof healthCheck.economy.total_cash_in_circulation === 'number'
                         ? healthCheck.economy.total_cash_in_circulation.toFixed(2)
                         : healthCheck.economy.total_cash_in_circulation}
                     </p>
                   </div>
-                  
+
                   <div className="bg-[#2A1F1A]/50 p-4 rounded-lg">
                     <p className="text-[#FAF3E0]/60 text-xs mb-1">Locked Value</p>
                     <p className="text-2xl font-bold text-[#A97142]">
@@ -556,8 +570,8 @@ export default function AdminPage({ user }) {
             <CardContent className="space-y-4">
               {/* Status Badge */}
               <div className="flex items-center gap-3">
-                <Badge className={economyValidation.validation.is_balanced ? 
-                  "bg-green-600 text-white text-lg px-6 py-2" : 
+                <Badge className={economyValidation.validation.is_balanced ?
+                  "bg-green-600 text-white text-lg px-6 py-2" :
                   "bg-red-600 text-white text-lg px-6 py-2"
                 }>
                   {economyValidation.validation.is_balanced ? '✅ SYSTEM BALANCED' : '⚠️ IMBALANCE DETECTED'}
@@ -609,9 +623,9 @@ export default function AdminPage({ user }) {
               {/* Validation Formula */}
               <div className="bg-[#4E3629]/30 p-4 rounded-lg border border-[#A97142]/30">
                 <p className="text-[#FAF3E0] font-mono text-sm">
-                  totalInitial ({economyValidation.breakdown.total_initial.toFixed(2)}) = 
-                  totalCash ({economyValidation.breakdown.total_cash.toFixed(2)}) + 
-                  totalLocked ({economyValidation.breakdown.total_locked.toFixed(2)}) = 
+                  totalInitial ({economyValidation.breakdown.total_initial.toFixed(2)}) =
+                  totalCash ({economyValidation.breakdown.total_cash.toFixed(2)}) +
+                  totalLocked ({economyValidation.breakdown.total_locked.toFixed(2)}) =
                   <span className={economyValidation.validation.is_balanced ? 'text-green-400' : 'text-red-400'}>
                     {' '}{economyValidation.breakdown.total_actual.toFixed(2)}
                   </span>
@@ -714,8 +728,8 @@ export default function AdminPage({ user }) {
                   <tbody>
                     {filteredPositions.length > 0 ? (
                       filteredPositions.map((position) => (
-                        <tr 
-                          key={position.position_id} 
+                        <tr
+                          key={position.position_id}
                           className="border-b border-[#A97142]/30 hover:bg-[#2A1F1A]/50 transition-colors"
                         >
                           <td className="py-3 px-4 text-[#FAF3E0] text-sm max-w-[200px] truncate">
@@ -788,13 +802,13 @@ export default function AdminPage({ user }) {
                               {market.category.replace('_', ' ').toUpperCase()}
                             </Badge>
                           </div>
-                          
+
                           <h3 className="text-xl font-bold text-[#FAF3E0] mb-2">
                             {market.title}
                           </h3>
-                          
+
                           <p className="text-[#FAF3E0]/70 mb-4">{market.description}</p>
-                          
+
                           <div className="flex items-center gap-4 text-sm text-[#FAF3E0]/60">
                             <div className="flex items-center gap-2">
                               <Calendar className="w-4 h-4" />
@@ -862,20 +876,20 @@ export default function AdminPage({ user }) {
                         <div className="flex-1">
                           <div className="flex items-start gap-3 mb-3">
                             <Badge className="bg-gray-600 text-white font-semibold">RESOLVED</Badge>
-                            <Badge 
-                              className={market.resolved_outcome ? 
-                                "bg-green-600 text-white font-bold" : 
+                            <Badge
+                              className={market.resolved_outcome ?
+                                "bg-green-600 text-white font-bold" :
                                 "bg-[#E34234] text-white font-bold"
                               }
                             >
                               {market.resolved_outcome ? '✅ YES' : '❌ NO'}
                             </Badge>
                           </div>
-                          
+
                           <h3 className="text-xl font-bold text-[#FAF3E0] mb-2">
                             {market.title}
                           </h3>
-                          
+
                           <p className="text-[#FAF3E0]/70 text-sm">
                             Resolved on {format(new Date(market.updated_date), 'MMM d, yyyy h:mm a')}
                           </p>
@@ -908,7 +922,7 @@ export default function AdminPage({ user }) {
               )}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="my-6 space-y-3 text-sm">
             <p className="text-[#FAF3E0]/90">This action will:</p>
             <div className="space-y-2 pl-4">
@@ -921,7 +935,7 @@ export default function AdminPage({ user }) {
                 <span>Pay <span className="font-bold">$0.00/share</span> to <span className={confirmDialog.outcome ? "text-red-400" : "text-green-400"}>{confirmDialog.outcome ? 'NO' : 'YES'}</span> holders</span>
               </div>
               <div className="flex items-start gap-2">
-                <DollarSign className="w-5 h-5 text-[#CD853F] mt-0.5" />
+                <Dollar className="w-5 h-5 text-[#CD853F] mt-0.5" />
                 <span>Refund all unfilled buy orders</span>
               </div>
               <div className="flex items-start gap-2">
@@ -941,8 +955,8 @@ export default function AdminPage({ user }) {
             </Button>
             <Button
               onClick={handleConfirmResolve}
-              className={confirmDialog.outcome ? 
-                "bg-green-600 hover:bg-green-700 text-white font-bold" : 
+              className={confirmDialog.outcome ?
+                "bg-green-600 hover:bg-green-700 text-white font-bold" :
                 "bg-[#E34234] hover:bg-[#C93529] text-white font-bold"
               }
             >
