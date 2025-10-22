@@ -1,8 +1,31 @@
 import { createClient } from '@base44/sdk';
-// import { getAccessToken } from '@base44/sdk/utils/auth-utils';
 
-// Create a client with authentication required
-export const base44 = createClient({
-  appId: "68d2b2a650846fbd3f78c242", 
-  requiresAuth: true // Ensure authentication is required for all operations
-});
+// Mock client for local development
+export const base44 = {
+  auth: {
+    me: async () => ({
+      email: "local-dev@example.com",
+      full_name: "Local Developer",
+      role: "admin",
+      verified: true
+    }),
+    loginWithRedirect: async () => null,
+    logout: async () => null
+  },
+  entities: {
+    Market: {
+      filter: async () => ([]),
+      findById: async () => null
+    },
+    Order: {
+      filter: async () => ([])
+    },
+    Position: {
+      filter: async () => ([])
+    }
+  },
+  functions: {
+    ensureUserBonus: async () => ({ success: true }),
+    calculatePortfolio: async () => ({ data: { total_value: 100 } })
+  }
+};

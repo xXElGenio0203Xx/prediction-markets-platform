@@ -21,5 +21,15 @@ export const Trade = base44.entities.Trade;
 
 
 
-// auth sdk:
-export const User = base44.auth;
+// Mock auth for local development
+export const User = {
+  me: async () => ({
+    email: "local-dev@example.com",
+    full_name: "Local Developer",
+    role: "admin",
+    verified: true
+  }),
+  loginWithRedirect: async () => null,
+  logout: async () => null,
+  ...base44.auth
+};
