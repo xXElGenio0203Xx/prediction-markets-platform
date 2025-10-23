@@ -10,7 +10,7 @@ export class OrderBook {
 
   constructor(
     private readonly outcome: 'YES' | 'NO',
-    private readonly marketId: string
+    _marketId: string
   ) {}
 
   /**
@@ -61,16 +61,25 @@ export class OrderBook {
     return this.asks[0] || null;
   }
 
-  /**
-   * Get all matching orders for a given order
-   * Returns orders that can be matched, sorted by price-time priority
+    /**
+   * Get orders that match the incoming order
+   * For BUY orders: return asks at or below the buy price (or all asks for market orders)
+   * For SELL orders: return bids at or above the sell price (or all bids for market orders)
    */
   getMatchingOrders(order: Order): Order[] {
     if (order.side === 'BUY') {
-      // Match against asks (sellers)
+      // Market orders match all available asks
+      if (order.type === 'MARKET') {
+        return [...this.asks];
+      }
+      // Limit orders match asks at or below buy price
       return this.asks.filter((ask) => ask.price <= order.price);
     } else {
-      // Match against bids (buyers)
+      // Market orders match all available bids
+      if (order.type === 'MARKET') {
+        return [...this.bids];
+      }
+      // Limit orders match bids at or above sell price
       return this.bids.filter((bid) => bid.price >= order.price);
     }
   }

@@ -1,73 +1,164 @@
-import { base44 } from './base44Client';
+/**
+ * Legacy functions compatibility layer
+ * Maps old Base44 function calls to new API client
+ * TODO: Refactor components to use api client directly
+ */
+import { api } from './client';
 
+// ==================== IMPLEMENTED ====================
 
-export const sendVerificationEmail = base44.functions.sendVerificationEmail;
+export const calculatePortfolio = async () => {
+  return api.getPortfolio();
+};
 
-export const verifyEmail = base44.functions.verifyEmail;
+export const cancelOrder = async (orderId) => {
+  return api.cancelOrder(orderId);
+};
 
-export const clearAuction = base44.functions.clearAuction;
+export const placeOrder = async (marketId, orderData) => {
+  return api.placeOrder(marketId, orderData);
+};
 
-export const settleAuction = base44.functions.settleAuction;
+export const resolveMarket = async (slug, outcome) => {
+  return api.resolveMarket(slug, outcome);
+};
 
-export const submitAuctionOrder = base44.functions.submitAuctionOrder;
+// ==================== STUBS (Not Yet Implemented) ====================
 
-export const getIndicativePrice = base44.functions.getIndicativePrice;
+export const broadcastMarketUpdate = async (marketId, data) => {
+  console.warn('broadcastMarketUpdate not implemented yet');
+  return { success: false, message: 'WebSocket updates not implemented' };
+};
 
-export const autoSettleAuction = base44.functions.autoSettleAuction;
+export const getLeaderboard = async () => {
+  console.warn('getLeaderboard not implemented yet');
+  return { users: [] };
+};
 
-export const calculatePortfolio = base44.functions.calculatePortfolio;
+export const ensureUserBonus = async (userId) => {
+  console.warn('ensureUserBonus not implemented yet');
+  return { success: true };
+};
 
-export const getLeaderboard = base44.functions.getLeaderboard;
+export const validateSystemBalance = async () => {
+  console.warn('validateSystemBalance not implemented yet');
+  return { valid: true };
+};
 
-export const initializeBrunoBonus = base44.functions.initializeBrunoBonus;
+export const systemHealthCheck = async () => {
+  console.warn('systemHealthCheck not implemented yet');
+  return { healthy: true };
+};
 
-export const marketUpdatesSSE = base44.functions.marketUpdatesSSE;
+export const adminResetBalances = async () => {
+  console.warn('adminResetBalances not implemented yet');
+  return { success: false, message: 'Not implemented' };
+};
 
-export const broadcastMarketUpdate = base44.functions.broadcastMarketUpdate;
+// ==================== DEPRECATED (No Longer Needed) ====================
 
-export const ensureUserBonus = base44.functions.ensureUserBonus;
+// Auction-based functions - not used in CLOB architecture
+export const sendVerificationEmail = async () => {
+  throw new Error('Deprecated: Email verification handled differently now');
+};
 
-export const resolveMarket = base44.functions.resolveMarket;
+export const verifyEmail = async () => {
+  throw new Error('Deprecated: Email verification handled differently now');
+};
 
-export const cancelOrder = base44.functions.cancelOrder;
+export const clearAuction = async () => {
+  throw new Error('Deprecated: Using CLOB, not auctions');
+};
 
-export const validateSystemBalance = base44.functions.validateSystemBalance;
+export const settleAuction = async () => {
+  throw new Error('Deprecated: Using CLOB, not auctions');
+};
 
-export const placeOrder = base44.functions.placeOrder;
+export const submitAuctionOrder = async () => {
+  throw new Error('Deprecated: Using CLOB, not auctions');
+};
 
-export const validateEconomy = base44.functions.validateEconomy;
+export const getIndicativePrice = async () => {
+  throw new Error('Deprecated: Using CLOB, not auctions');
+};
 
-export const getAuctionStats = base44.functions.getAuctionStats;
+export const autoSettleAuction = async () => {
+  throw new Error('Deprecated: Using CLOB, not auctions');
+};
 
-export const validateUserBalance = base44.functions.validateUserBalance;
+export const initializeBrunoBonus = async () => {
+  throw new Error('Deprecated: Bonus system redesigned');
+};
 
-export const recalculateUserPortfolio = base44.functions.recalculateUserPortfolio;
+export const marketUpdatesSSE = async () => {
+  throw new Error('Deprecated: Use WebSocket client instead');
+};
 
-export const systemHealthCheck = base44.functions.systemHealthCheck;
+export const validateEconomy = async () => {
+  throw new Error('Deprecated: Validation logic moved to backend');
+};
 
-export const adminResetBalances = base44.functions.adminResetBalances;
+export const getAuctionStats = async () => {
+  throw new Error('Deprecated: Using CLOB, not auctions');
+};
 
-export const autoFixBalances = base44.functions.autoFixBalances;
+export const validateUserBalance = async () => {
+  throw new Error('Deprecated: Validation logic moved to backend');
+};
 
-export const auctionPreopen = base44.functions.auctionPreopen;
+export const recalculateUserPortfolio = async () => {
+  throw new Error('Deprecated: Portfolio calculation moved to backend');
+};
 
-export const auctionClose = base44.functions.auctionClose;
+export const autoFixBalances = async () => {
+  throw new Error('Deprecated: Balance fixing moved to backend');
+};
 
-export const liveOpen = base44.functions.liveOpen;
+// Additional deprecated functions - all Base44 specific
+export const auctionPreopen = async () => {
+  throw new Error('Deprecated: Using CLOB, not auctions');
+};
 
-export const autoResolveMarket = base44.functions.autoResolveMarket;
+export const auctionClose = async () => {
+  throw new Error('Deprecated: Using CLOB, not auctions');
+};
 
-export const getTradingMode = base44.functions.getTradingMode;
+export const liveOpen = async () => {
+  throw new Error('Deprecated: Market lifecycle handled differently now');
+};
 
-export const migratePositionsEntryPrice = base44.functions.migratePositionsEntryPrice;
+export const autoResolveMarket = async () => {
+  throw new Error('Deprecated: Use resolveMarket instead');
+};
 
-export const portfolioMathSelfTest = base44.functions.portfolioMathSelfTest;
+export const getTradingMode = async () => {
+  throw new Error('Deprecated: Trading mode concept removed');
+};
 
-export const getFeeConfig = base44.functions.getFeeConfig;
+export const migratePositionsEntryPrice = async () => {
+  throw new Error('Deprecated: Migration functions no longer needed');
+};
 
-export const ensureFeesTreasury = base44.functions.ensureFeesTreasury;
+export const portfolioMathSelfTest = async () => {
+  throw new Error('Deprecated: Testing moved to backend');
+};
 
-export const applyClobFees = base44.functions.applyClobFees;
+export const getFeeConfig = async () => {
+  console.warn('getFeeConfig not implemented yet');
+  return { maker_bps: 0, taker_bps: 0, per_contract_fee: 0 };
+};
 
-export const getFeesSummary = base44.functions.getFeesSummary;
+export const ensureFeesTreasury = async () => {
+  throw new Error('Deprecated: Treasury management moved to backend');
+};
+
+export const applyClobFees = async () => {
+  console.warn('applyClobFees not implemented yet');
+  return { success: true };
+};
+
+export const getFeesSummary = async () => {
+  console.warn('getFeesSummary not implemented yet');
+  return { today: 0, thisWeek: 0, thisMonth: 0, allTime: 0 };
+};
 

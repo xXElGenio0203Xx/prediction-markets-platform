@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import type { FastifyBaseLogger } from 'fastify';
 import { OrderBook } from './book.js';
 import type { Order, Trade, MatchResult, Orderbook } from './types.js';
@@ -31,7 +31,7 @@ export class MatchingEngine {
     this.logger.info({ orderId: order.id, marketId: order.marketId }, 'Submitting order');
 
     // Execute in transaction
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Get or create orderbook
       const book = this.getOrCreateBook(order.marketId);
       const outcomeBook = order.outcome === 'YES' ? book.yes : book.no;
@@ -39,12 +39,34 @@ export class MatchingEngine {
       // Check for self-trade prevention
       const matchingOrders = outcomeBook.getMatchingOrders(order);
       const nonSelfOrders = matchingOrders.filter((o) => o.userId !== order.userId);
+      const selfTradesBlocked = matchingOrders.length - nonSelfOrders.length;
 
-      if (nonSelfOrders.length < matchingOrders.length) {
+      // Log self-trade prevention
+      if (selfTradesBlocked > 0) {
         this.logger.warn(
-          { orderId: order.id, userId: order.userId },
-          'Self-trade prevented'
+          {
+            orderId: order.id,
+            userId: order.userId,
+            marketId: order.marketId,
+            blockedOrders: selfTradesBlocked,
+          },
+          'Self-trade prevention: blocked matching against own orders'
         );
+
+        // Create order events for self-trade prevention
+        for (const selfOrder of matchingOrders.filter((o) => o.userId === order.userId)) {
+          await tx.orderEvent.create({
+            data: {
+              orderId: order.id,
+              type: 'SELF_TRADE_PREVENTED',
+              data: {
+                blockedOrderId: selfOrder.id,
+                price: selfOrder.price,
+                quantity: selfOrder.quantity - selfOrder.filled,
+              },
+            },
+          });
+        }
       }
 
       // Execute matches
@@ -157,6 +179,31 @@ export class MatchingEngine {
         outcomeBook.addOrder(order);
       }
 
+      // Market orders that don't fill completely are cancelled
+      if (order.type === 'MARKET' && order.status !== 'FILLED') {
+        order.status = 'CANCELLED';
+        await tx.orderEvent.create({
+          data: {
+            orderId: order.id,
+            type: 'CANCELLED',
+            data: {
+              reason: 'insufficient_liquidity',
+              filled: order.filled,
+              requested: order.quantity,
+            },
+          },
+        });
+
+        this.logger.info(
+          {
+            orderId: order.id,
+            filled: order.filled,
+            requested: order.quantity,
+          },
+          'Market order partially filled and cancelled due to insufficient liquidity'
+        );
+      }
+
       // Persist order
       await tx.order.create({
         data: {
@@ -202,7 +249,7 @@ export class MatchingEngine {
    * Cancel order
    */
   async cancelOrder(orderId: string, userId: string): Promise<Order> {
-    return await this.prisma.$transaction(async (tx) => {
+    return await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const dbOrder = await tx.order.findUnique({
         where: { id: orderId },
       });
@@ -310,7 +357,7 @@ export class MatchingEngine {
    * Settle trade within transaction
    * Updates balances and positions atomically
    */
-  private async settleTradeInTransaction(tx: any, trade: Trade): Promise<void> {
+  private async settleTradeInTransaction(tx: Prisma.TransactionClient, trade: Trade): Promise<void> {
     const tradeValue = trade.price * trade.quantity;
 
     // Update buyer: decrease available balance, create/update position
@@ -392,7 +439,7 @@ export class MatchingEngine {
   /**
    * Update market prices based on recent trades
    */
-  private async updateMarketPrices(tx: any, marketId: string): Promise<void> {
+  private async updateMarketPrices(tx: Prisma.TransactionClient, marketId: string): Promise<void> {
     // Get latest trades
     const recentTrades = await tx.trade.findMany({
       where: { marketId },

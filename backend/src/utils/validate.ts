@@ -1,10 +1,10 @@
 // src/utils/validate.ts
-import { FastifyRequest, FastifyReply, preHandlerHookHandler } from 'fastify';
+import { FastifyRequest, preHandlerHookHandler } from 'fastify';
 import { z, ZodSchema } from 'zod';
 import { AppError } from './errors.js';
 
 export function validateBody<T>(schema: ZodSchema<T>): preHandlerHookHandler {
-  return async (request: FastifyRequest, reply: FastifyReply) => {
+  return async (request: FastifyRequest) => {
     try {
       request.body = schema.parse(request.body);
     } catch (error) {
@@ -17,7 +17,7 @@ export function validateBody<T>(schema: ZodSchema<T>): preHandlerHookHandler {
 }
 
 export function validateQuery<T>(schema: ZodSchema<T>): preHandlerHookHandler {
-  return async (request: FastifyRequest, reply: FastifyReply) => {
+  return async (request: FastifyRequest) => {
     try {
       request.query = schema.parse(request.query);
     } catch (error) {
@@ -30,7 +30,7 @@ export function validateQuery<T>(schema: ZodSchema<T>): preHandlerHookHandler {
 }
 
 export function validateParams<T>(schema: ZodSchema<T>): preHandlerHookHandler {
-  return async (request: FastifyRequest, reply: FastifyReply) => {
+  return async (request: FastifyRequest) => {
     try {
       request.params = schema.parse(request.params);
     } catch (error) {

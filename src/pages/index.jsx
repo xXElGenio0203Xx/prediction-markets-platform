@@ -16,6 +16,14 @@ import AllMarkets from "./AllMarkets";
 
 import Admin from "./Admin";
 
+import PortfolioAnalytics from "./PortfolioAnalytics";
+
+import MarketAnalytics from "./MarketAnalytics";
+
+import TradeHistory from "./TradeHistory";
+
+import PlatformMetrics from "./PlatformMetrics";
+
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
@@ -35,6 +43,14 @@ const PAGES = {
     AllMarkets: AllMarkets,
     
     Admin: Admin,
+    
+    PortfolioAnalytics: PortfolioAnalytics,
+    
+    MarketAnalytics: MarketAnalytics,
+    
+    TradeHistory: TradeHistory,
+    
+    PlatformMetrics: PlatformMetrics,
     
 }
 
@@ -78,6 +94,14 @@ function PagesContent() {
                 <Route path="/AllMarkets" element={<AllMarkets />} />
                 
                 <Route path="/Admin" element={<Admin />} />
+                
+                <Route path="/PortfolioAnalytics" element={<PortfolioAnalytics />} />
+                
+                <Route path="/MarketAnalytics/:slug" element={<MarketAnalytics />} />
+                
+                <Route path="/TradeHistory" element={<TradeHistory />} />
+                
+                <Route path="/PlatformMetrics" element={<PlatformMetrics />} />
                 
             </Routes>
         </Layout>

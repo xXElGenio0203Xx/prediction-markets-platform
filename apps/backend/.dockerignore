@@ -1,0 +1,13 @@
+# Fly.io - Ignore files not needed in container
+node_modules/
+dist/
+*.log
+.env*
+!.env.example
+.git/
+.github/
+.vscode/
+*.md
+!README.md
+coverage/
+.DS_Store

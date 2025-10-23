@@ -1,0 +1,32 @@
+{
+  "name": "prediction-markets-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production-ready prediction market platform with CLOB - Monorepo",
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "type-check": "pnpm -r type-check",
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "backend:dev": "pnpm --filter @prediction-markets/backend dev",
+    "frontend:dev": "pnpm --filter @prediction-markets/frontend dev",
+    "shared:build": "pnpm --filter @prediction-markets/shared build",
+    "backend:deploy": "cd apps/backend && flyctl deploy",
+    "frontend:deploy": "cd apps/frontend && vercel --prod",
+    "setup": "pnpm install && pnpm shared:build && pnpm prisma:generate",
+    "prisma:generate": "cd apps/backend && pnpm prisma generate",
+    "prisma:migrate": "cd apps/backend && pnpm prisma migrate deploy",
+    "prisma:studio": "cd apps/backend && pnpm prisma studio"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.6.0"
+  }
+}

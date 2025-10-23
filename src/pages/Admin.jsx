@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { Market } from "@/api/entities";
+import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,15 +26,12 @@ import {
   Search,
   ArrowUpDown,
   DollarSign as Dollar,
-  PiggyBank
+  PiggyBank,
+  BarChart2
 } from "lucide-react";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
-import { resolveMarket } from "@/api/functions";
-import { validateSystemBalance } from "@/api/functions";
-import { systemHealthCheck } from "@/api/functions";
-import { adminResetBalances } from "@/api/functions";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/client";
 import FeesTile from "../components/admin/FeesTile"; // Added import
 
 export default function AdminPage({ user }) {
@@ -335,11 +332,19 @@ export default function AdminPage({ user }) {
           animate={{ opacity: 1, y: 0 }}
           className="mb-12"
         >
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-[#A97142] to-[#CD853F] rounded-full flex items-center justify-center">
-              <Shield className="w-7 h-7 text-white" />
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-[#A97142] to-[#CD853F] rounded-full flex items-center justify-center">
+                <Shield className="w-7 h-7 text-white" />
+              </div>
+              <h1 className="text-4xl font-bold text-[#FAF3E0]">Market Resolution Admin Panel</h1>
             </div>
-            <h1 className="text-4xl font-bold text-[#FAF3E0]">Market Resolution Admin Panel</h1>
+            <Link to="/PlatformMetrics">
+              <Button variant="outline" className="flex items-center gap-2">
+                <BarChart2 className="h-4 w-4" />
+                Platform Metrics
+              </Button>
+            </Link>
           </div>
           <p className="text-lg text-[#FAF3E0]/70">
             Manage and resolve prediction markets • Verify payouts and system balance

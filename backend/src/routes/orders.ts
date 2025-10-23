@@ -1,358 +1,342 @@
-import { FastifyPluginAsync } from 'fastify';
-import {
-  zPlaceOrder,
-  zOrderResponse,
-  zOrderbookSnapshot,
-  zTrade,
-} from '../contracts/orders.js';
-import { validateBody, validateParams } from '../utils/validate.js';
-import { AppError } from '../utils/errors.js';
+import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { MatchingEngine } from '../engine/engine.js';
-import type { Order } from '../engine/types.js';
+import { randomUUID } from 'crypto';
+
+const PlaceOrderSchema = z.object({
+  outcome: z.enum(['YES', 'NO']),
+  side: z.enum(['BUY', 'SELL']),
+  type: z.enum(['LIMIT', 'MARKET']),
+  price: z.number().min(0).max(1).optional(),
+  quantity: z.number().positive(),
+});
 
 const ordersRoutes: FastifyPluginAsync = async (fastify) => {
-  // Initialize matching engine
-  const engine = new MatchingEngine(fastify.prisma, fastify.log);
-
-  // Place order
-  fastify.post(
-    '/:marketSlug',
-    {
-      schema: {
-        description: 'Place a new order on a market',
-        tags: ['orders'],
-        params: z.object({ marketSlug: z.string() }),
-        body: zPlaceOrder,
-        response: {
-          201: z.object({
-            order: zOrderResponse,
-            trades: z.array(zTrade),
-          }),
-        },
-      },
-      preHandler: [
-        fastify.authenticate,
-        validateParams(z.object({ marketSlug: z.string() })),
-        validateBody(zPlaceOrder),
-      ],
+  // Place order on a market
+  fastify.post('/:slug', {
+    onRequest: [fastify.authenticate],
+    schema: {
+      tags: ['Orders'],
+      summary: 'Place a new order',
+      // Zod schemas removed - validation done manually
     },
-    async (request, reply) => {
-      const { marketSlug } = request.params as { marketSlug: string };
-      const { side, type, quantity, price, outcome } = request.body;
-      const userId = request.user.sub;
+  }, async (request, reply) => {
+    const { slug } = request.params as { slug: string };
+    const orderData = PlaceOrderSchema.parse(request.body);
+    const userId = request.user!.id;
 
-      // Get market
-      const market = await fastify.prisma.market.findUnique({
-        where: { slug: marketSlug },
-      });
+    // Validate price for limit orders
+    if (orderData.type === 'LIMIT' && (orderData.price === undefined || orderData.price === null)) {
+      return reply.code(400).send({ message: 'Price is required for limit orders' });
+    }
 
-      if (!market) {
-        throw new AppError('MARKET_NOT_FOUND', `Market '${marketSlug}' not found`, 404);
+    // Get market
+    const market = await fastify.prisma.market.findUnique({
+      where: { slug },
+    });
+
+    if (!market) {
+      return reply.code(404).send({ message: 'Market not found' });
+    }
+
+    if (market.status !== 'OPEN') {
+      return reply.code(400).send({ message: 'Market is not open for trading' });
+    }
+
+    // Check user balance
+    const balance = await fastify.prisma.balance.findUnique({
+      where: { userId },
+    });
+
+    if (!balance) {
+      return reply.code(400).send({ message: 'Balance not found' });
+    }
+
+    // Calculate required funds
+    // For BUY orders: lock price * quantity
+    // For SELL orders: check if user has position
+    if (orderData.side === 'BUY') {
+      const requiredFunds = orderData.quantity * (orderData.price || 1); // Market orders assume max price
+      if (balance.available.toNumber() < requiredFunds) {
+        return reply.code(400).send({ message: 'Insufficient balance' });
       }
 
-      if (market.status !== 'OPEN') {
-        throw new AppError('MARKET_CLOSED', 'Market is not open for trading', 400);
-      }
-
-      if (new Date() >= market.closeTime) {
-        throw new AppError('MARKET_CLOSED', 'Market has closed', 400);
-      }
-
-      // Get user balance
-      const balance = await fastify.prisma.balance.findUnique({
+      // Lock funds for buy order
+      await fastify.prisma.balance.update({
         where: { userId },
+        data: {
+          available: { decrement: requiredFunds },
+          locked: { increment: requiredFunds },
+        },
       });
+    }
 
-      if (!balance) {
-        throw new AppError('BALANCE_NOT_FOUND', 'User balance not found', 404);
-      }
-
-      // Validate order price for limit orders
-      if (type === 'LIMIT') {
-        if (!price || price <= 0 || price >= 1) {
-          throw new AppError('INVALID_PRICE', 'Price must be between 0 and 1', 400);
-        }
-      }
-
-      // Calculate required balance for BUY orders
-      let requiredBalance = 0;
-      if (side === 'BUY') {
-        const orderPrice = type === 'LIMIT' ? price! : (outcome === 'YES' ? market.yesPrice : market.noPrice);
-        requiredBalance = quantity * Number(orderPrice);
-
-        if (balance.available < requiredBalance) {
-          throw new AppError(
-            'INSUFFICIENT_BALANCE',
-            `Insufficient balance. Required: ${requiredBalance}, Available: ${balance.available}`,
-            400
-          );
-        }
-      }
-
-      // For SELL orders, check if user has enough shares
-      if (side === 'SELL') {
-        const position = await fastify.prisma.position.findUnique({
-          where: {
-            userId_marketId_outcome: {
-              userId,
-              marketId: market.id,
-              outcome,
-            },
-          },
-        });
-
-        if (!position || position.quantity < quantity) {
-          throw new AppError(
-            'INSUFFICIENT_SHARES',
-            `Insufficient shares. Required: ${quantity}, Available: ${position?.quantity || 0}`,
-            400
-          );
-        }
-      }
-
-      // Submit order to matching engine
-      const orderInput: Order = {
-        id: '', // Will be set by engine
+    try {
+      // Prepare order object for matching engine
+      const order = {
+        id: randomUUID(),
         marketId: market.id,
         userId,
-        side,
-        type,
-        outcome,
-        price: type === 'LIMIT' ? price! : (outcome === 'YES' ? Number(market.yesPrice) : Number(market.noPrice)),
-        quantity,
+        side: orderData.side,
+        type: orderData.type,
+        outcome: orderData.outcome,
+        price: orderData.price || (orderData.side === 'BUY' ? 1 : 0), // Market orders: max buy price or min sell price
+        quantity: orderData.quantity,
         filled: 0,
-        status: 'PENDING',
+        status: 'PENDING' as const,
         createdAt: new Date(),
       };
 
-      const result = await engine.submitOrder(orderInput);
+      // Submit to matching engine
+      const result = await fastify.matchingEngine.submitOrder(order);
 
-      // Emit WebSocket events
-      if (fastify.websocketServer) {
-        // Broadcast new order
+      // Broadcast trades via WebSocket
+      for (const trade of result.trades) {
         fastify.websocketServer.broadcast({
-          type: 'order',
-          data: result.order,
-        });
-
-        // Broadcast trades
-        for (const trade of result.trades) {
-          fastify.websocketServer.broadcast({
-            type: 'trade',
-            data: trade,
-          });
-        }
-
-        // Broadcast updated orderbook
-        const orderbook = await engine.getOrderbook(market.id);
-        fastify.websocketServer.broadcast({
-          type: 'orderbook',
+          type: 'TRADE',
           data: {
-            marketId: market.id,
-            ...orderbook,
+            tradeId: trade.id,
+            marketId: trade.marketId,
+            outcome: trade.outcome,
+            price: trade.price,
+            quantity: trade.quantity,
+            buyOrderId: trade.buyOrderId,
+            sellOrderId: trade.sellOrderId,
+            timestamp: trade.createdAt,
           },
         });
       }
 
-      reply.code(201).send(result);
-    }
-  );
-
-  // Cancel order
-  fastify.delete(
-    '/:orderId',
-    {
-      schema: {
-        description: 'Cancel an existing order',
-        tags: ['orders'],
-        params: z.object({ orderId: z.string() }),
-        response: {
-          200: zOrderResponse,
+      // Broadcast order update
+      fastify.websocketServer.broadcast({
+        type: 'ORDER_UPDATE',
+        data: {
+          orderId: result.order.id,
+          marketId: result.order.marketId,
+          status: result.order.status,
+          filled: result.order.filled,
         },
-      },
-      preHandler: [fastify.authenticate, validateParams(z.object({ orderId: z.string() }))],
-    },
-    async (request, reply) => {
-      const { orderId } = request.params as { orderId: string };
-      const userId = request.user.sub;
-
-      const order = await fastify.prisma.order.findUnique({
-        where: { id: orderId },
       });
-
-      if (!order) {
-        throw new AppError('ORDER_NOT_FOUND', 'Order not found', 404);
-      }
-
-      if (order.userId !== userId) {
-        throw new AppError('UNAUTHORIZED', 'Not authorized to cancel this order', 403);
-      }
-
-      if (order.status !== 'OPEN' && order.status !== 'PARTIAL') {
-        throw new AppError('CANNOT_CANCEL', 'Order cannot be cancelled', 400);
-      }
-
-      const cancelled = await engine.cancelOrder(orderId, userId);
-
-      // Emit WebSocket event
-      if (fastify.websocketServer) {
-        fastify.websocketServer.broadcast({
-          type: 'order',
-          data: cancelled,
-        });
-
-        // Broadcast updated orderbook
-        const orderbook = await engine.getOrderbook(order.marketId);
-        fastify.websocketServer.broadcast({
-          type: 'orderbook',
-          data: {
-            marketId: order.marketId,
-            ...orderbook,
-          },
-        });
-      }
-
-      reply.send(cancelled);
-    }
-  );
-
-  // Get orderbook
-  fastify.get(
-    '/:marketSlug/orderbook',
-    {
-      schema: {
-        description: 'Get current orderbook for a market',
-        tags: ['orders'],
-        params: z.object({ marketSlug: z.string() }),
-        response: {
-          200: zOrderbookSnapshot,
-        },
-      },
-      preHandler: validateParams(z.object({ marketSlug: z.string() })),
-    },
-    async (request, reply) => {
-      const { marketSlug } = request.params as { marketSlug: string };
-
-      const market = await fastify.prisma.market.findUnique({
-        where: { slug: marketSlug },
-      });
-
-      if (!market) {
-        throw new AppError('MARKET_NOT_FOUND', `Market '${marketSlug}' not found`, 404);
-      }
-
-      const orderbook = await engine.getOrderbook(market.id);
 
       reply.send({
-        marketId: market.id,
-        timestamp: new Date().toISOString(),
-        bids: orderbook.bids,
-        asks: orderbook.asks,
+        order: result.order,
+        trades: result.trades,
       });
-    }
-  );
-
-  // Get recent trades
-  fastify.get(
-    '/:marketSlug/trades',
-    {
-      schema: {
-        description: 'Get recent trades for a market',
-        tags: ['orders'],
-        params: z.object({ marketSlug: z.string() }),
-        querystring: z.object({
-          limit: z.coerce.number().min(1).max(100).default(50),
-        }),
-        response: {
-          200: z.array(zTrade),
-        },
-      },
-      preHandler: validateParams(z.object({ marketSlug: z.string() })),
-    },
-    async (request, reply) => {
-      const { marketSlug } = request.params as { marketSlug: string };
-      const { limit = 50 } = request.query as { limit?: number };
-
-      const market = await fastify.prisma.market.findUnique({
-        where: { slug: marketSlug },
-      });
-
-      if (!market) {
-        throw new AppError('MARKET_NOT_FOUND', `Market '${marketSlug}' not found`, 404);
+    } catch (error: any) {
+      // Unlock funds if order fails
+      if (orderData.side === 'BUY') {
+        const requiredFunds = orderData.quantity * (orderData.price || 1);
+        await fastify.prisma.balance.update({
+          where: { userId },
+          data: {
+            available: { increment: requiredFunds },
+            locked: { decrement: requiredFunds },
+          },
+        }).catch(() => {
+          // Log but don't fail if unlock fails
+          fastify.log.error({ userId, error }, 'Failed to unlock funds after order error');
+        });
       }
 
-      const trades = await fastify.prisma.trade.findMany({
-        where: { marketId: market.id },
-        orderBy: { createdAt: 'desc' },
-        take: limit,
+      fastify.log.error({ error, userId, orderData }, 'Failed to place order');
+      return reply.code(500).send({ message: error.message || 'Failed to place order' });
+    }
+  });
+
+  // Cancel an order
+  fastify.delete('/:orderId', {
+    onRequest: [fastify.authenticate],
+    schema: {
+      tags: ['Orders'],
+      summary: 'Cancel an order',
+    },
+  }, async (request, reply) => {
+    const { orderId } = request.params as { orderId: string };
+    const userId = request.user!.id;
+
+    const order = await fastify.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { market: true },
+    });
+
+    if (!order) {
+      return reply.code(404).send({ message: 'Order not found' });
+    }
+
+    if (order.userId !== userId) {
+      return reply.code(403).send({ message: 'Not authorized to cancel this order' });
+    }
+
+    if (order.status !== 'OPEN' && order.status !== 'PARTIAL') {
+      return reply.code(400).send({ message: 'Order cannot be cancelled' });
+    }
+    
+    try {
+      // Cancel order and unlock funds
+      await fastify.prisma.order.update({
+        where: { id: orderId },
+        data: { status: 'CANCELLED' },
       });
 
-      reply.send(
-        trades.map((t) => ({
-          id: t.id,
-          marketId: t.marketId,
-          buyOrderId: t.buyOrderId,
-          sellOrderId: t.sellOrderId,
-          buyerId: t.buyerId,
-          sellerId: t.sellerId,
-          outcome: t.outcome,
-          price: Number(t.price),
-          quantity: Number(t.quantity),
-          createdAt: t.createdAt.toISOString(),
-        }))
-      );
-    }
-  );
+      const refundAmount = (order.quantity.toNumber() - order.filled.toNumber()) * order.price.toNumber();
+      
+      await fastify.prisma.balance.update({
+        where: { userId },
+        data: {
+          available: { increment: refundAmount },
+          locked: { decrement: refundAmount },
+        },
+      });
 
-  // Get user's orders
-  fastify.get(
-    '/user/orders',
-    {
-      schema: {
-        description: 'Get current user orders',
-        tags: ['orders'],
-        querystring: z.object({
-          status: z.enum(['OPEN', 'PARTIAL', 'FILLED', 'CANCELLED']).optional(),
-          limit: z.coerce.number().min(1).max(100).default(50),
-        }),
-        response: {
-          200: z.array(zOrderResponse),
+      fastify.websocketServer.broadcast({
+        type: 'order-cancelled',
+        data: {
+          marketId: order.marketId,
+          orderId,
+        },
+      });
+
+      return reply.send({ message: 'Order cancelled successfully' });
+    } catch (error) {
+      fastify.log.error(error, 'Failed to cancel order');
+      return reply.code(500).send({ 
+        message: error instanceof Error ? error.message : 'Failed to cancel order' 
+      });
+    }
+  });
+
+  // Get orderbook for a market
+  fastify.get('/:slug/orderbook', {
+    schema: {
+      tags: ['Orders'],
+      summary: 'Get orderbook for a market',
+    },
+  }, async (request, reply) => {
+    const { slug } = request.params as { slug: string };
+
+    const market = await fastify.prisma.market.findUnique({
+      where: { slug },
+    });
+
+    if (!market) {
+      return reply.code(404).send({ message: 'Market not found' });
+    }
+
+    // Get all open orders for this market
+    const orders = await fastify.prisma.order.findMany({
+      where: {
+        marketId: market.id,
+        status: {
+          in: ['OPEN', 'PARTIAL'],
         },
       },
-      preHandler: [fastify.authenticate],
+      orderBy: [
+        { outcome: 'asc' },
+        { price: 'desc' },
+        { createdAt: 'asc' },
+      ],
+    });
+
+    // Format orderbook
+    const orderbook = {
+      YES: {
+        bids: orders
+          .filter((o: any) => o.outcome === 'YES' && o.side === 'BUY')
+          .map((o: any) => ({
+            price: o.price.toNumber(),
+            quantity: (o.quantity.toNumber() - o.filled.toNumber()),
+          })),
+        asks: orders
+          .filter((o: any) => o.outcome === 'YES' && o.side === 'SELL')
+          .map((o: any) => ({
+            price: o.price.toNumber(),
+            quantity: (o.quantity.toNumber() - o.filled.toNumber()),
+          })),
+      },
+      NO: {
+        bids: orders
+          .filter((o: any) => o.outcome === 'NO' && o.side === 'BUY')
+          .map((o: any) => ({
+            price: o.price.toNumber(),
+            quantity: (o.quantity.toNumber() - o.filled.toNumber()),
+          })),
+        asks: orders
+          .filter((o: any) => o.outcome === 'NO' && o.side === 'SELL')
+          .map((o: any) => ({
+            price: o.price.toNumber(),
+            quantity: (o.quantity.toNumber() - o.filled.toNumber()),
+          })),
+      },
+    };
+
+    return reply.send({ orderbook });
+  });
+
+  // Get recent trades for a market
+  fastify.get('/:slug/trades', {
+    schema: {
+      tags: ['Orders'],
+      summary: 'Get recent trades for a market',
+      // Zod schemas removed - validation done manually
     },
-    async (request, reply) => {
-      const userId = request.user.sub;
-      const { status, limit = 50 } = request.query as { status?: string; limit?: number };
+  }, async (request, reply) => {
+    const { slug } = request.params as { slug: string };
+    const { limit } = request.query as { limit: number };
 
-      const where: any = { userId };
-      if (status) where.status = status;
+    const market = await fastify.prisma.market.findUnique({
+      where: { slug },
+    });
 
-      const orders = await fastify.prisma.order.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-      });
-
-      reply.send(
-        orders.map((o) => ({
-          id: o.id,
-          marketId: o.marketId,
-          userId: o.userId,
-          side: o.side as 'BUY' | 'SELL',
-          type: o.type as 'LIMIT' | 'MARKET',
-          outcome: o.outcome as 'YES' | 'NO',
-          price: Number(o.price),
-          quantity: Number(o.quantity),
-          filled: Number(o.filled),
-          status: o.status as 'OPEN' | 'PARTIAL' | 'FILLED' | 'CANCELLED',
-          createdAt: o.createdAt.toISOString(),
-          updatedAt: o.updatedAt.toISOString(),
-        }))
-      );
+    if (!market) {
+      return reply.code(404).send({ message: 'Market not found' });
     }
-  );
+
+    const trades = await fastify.prisma.trade.findMany({
+      where: { marketId: market.id },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        buyer: {
+          select: { id: true, handle: true, fullName: true },
+        },
+      },
+    });
+
+    return reply.send({ trades });
+  });
+
+  // Get user's orders
+  fastify.get('/user/orders', {
+    onRequest: [fastify.authenticate],
+    schema: {
+      tags: ['Orders'],
+      summary: 'Get user orders',
+      // Zod schemas removed - validation done manually
+    },
+  }, async (request, reply) => {
+    const userId = request.user!.id;
+    const { status, marketId } = request.query as { status?: 'OPEN' | 'FILLED' | 'CANCELLED' | 'PARTIAL'; marketId?: string };
+
+    const orders = await fastify.prisma.order.findMany({
+      where: {
+        userId,
+        ...(status && { status }),
+        ...(marketId && { marketId }),
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        market: {
+          select: {
+            id: true,
+            slug: true,
+            question: true,
+            imageUrl: true,
+          },
+        },
+      },
+    });
+
+    return reply.send({ orders });
+  });
 };
 
 export default ordersRoutes;

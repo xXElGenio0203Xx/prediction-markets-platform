@@ -1,11 +1,18 @@
-// This is your Prisma schema file
+// Prisma schema for Prediction Market with Supabase
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
 }
 
 enum OrderSide {
@@ -19,177 +26,229 @@ enum OrderType {
 }
 
 enum OrderStatus {
+  PENDING
   OPEN
-  PARTIALLY_FILLED
+  PARTIAL
   FILLED
-  CANCELED
+  CANCELLED
 }
 
 enum MarketStatus {
-  DRAFT
   OPEN
+  CLOSED
   RESOLVED
-  CANCELED
+  CANCELLED
 }
 
-enum UserRole {
-  USER
-  ADMIN
+enum Outcome {
+  YES
+  NO
 }
 
+enum TransferType {
+  DEPOSIT
+  WITHDRAWAL
+}
+
+enum TransferStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+// User model
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
+  id           String   @id @default(uuid())
+  email        String   @unique
+  handle       String?  @unique
   passwordHash String
-  role         UserRole  @default(USER)
   fullName     String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  role         UserRole @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  sessions     Session[]
-  orders       Order[]
-  balance      Balance?
-  positions    Position[]
-  transfers    Transfer[]
-  createdMarkets Market[] @relation("MarketCreator")
+  sessions  Session[]
+  balance   Balance?
+  orders    Order[]
+  trades    Trade[]     @relation("UserTrades")
+  positions Position[]
+  transfers Transfer[]
+  markets   Market[]    @relation("MarketCreator")
 
   @@index([email])
+  @@index([role])
 }
 
+// Session for JWT refresh tokens
 model Session {
   id               String   @id @default(uuid())
   userId           String
-  refreshTokenHash String
+  refreshToken     String   @unique
   expiresAt        DateTime
+  userAgent        String?
+  ipAddress        String?
   createdAt        DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([refreshToken])
   @@index([expiresAt])
 }
 
+// Market model
 model Market {
-  id             String       @id @default(uuid())
-  slug           String       @unique
-  question       String
-  description    String?
-  status         MarketStatus @default(DRAFT)
-  resolutionText String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  creatorId      String
+  id           String       @id @default(uuid())
+  slug         String       @unique
+  question     String
+  imageUrl     String?
+  description  String?
+  category     String
+  status       MarketStatus @default(OPEN)
+  createdBy    String
+  closeTime    DateTime
+  resolveTime  DateTime?
+  outcome      Outcome?
+  resolutionSource String?
+  featured     Boolean      @default(false)
+  volume24h    Decimal      @default(0) @db.Decimal(18, 4)
+  liquidity    Decimal      @default(0) @db.Decimal(18, 4)
+  yesPrice     Decimal      @default(0.5) @db.Decimal(18, 4)
+  noPrice      Decimal      @default(0.5) @db.Decimal(18, 4)
+  yesShares    Decimal      @default(0) @db.Decimal(18, 4)
+  noShares     Decimal      @default(0) @db.Decimal(18, 4)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
-  creator   User       @relation("MarketCreator", fields: [creatorId], references: [id])
+  creator   User       @relation("MarketCreator", fields: [createdBy], references: [id])
   orders    Order[]
   trades    Trade[]
   positions Position[]
   candles   Candle[]
 
+  @@index([slug])
   @@index([status])
-  @@index([createdAt])
-  @@index([creatorId])
+  @@index([category])
+  @@index([featured])
+  @@index([closeTime])
+  @@index([createdBy])
 }
 
+// Order model
 model Order {
-  id         String      @id @default(uuid())
-  userId     String
-  marketId   String
-  side       OrderSide
-  type       OrderType
-  price      Decimal?    @db.Decimal(18, 4)
-  qty        Decimal     @db.Decimal(18, 4)
-  qtyFilled  Decimal     @default(0) @db.Decimal(18, 4)
-  status     OrderStatus @default(OPEN)
-  seq        BigInt      @default(autoincrement())
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id        String      @id @default(uuid())
+  marketId  String
+  userId    String
+  side      OrderSide
+  type      OrderType
+  outcome   Outcome
+  price     Decimal     @db.Decimal(18, 4)
+  quantity  Decimal     @db.Decimal(18, 4)
+  filled    Decimal     @default(0) @db.Decimal(18, 4)
+  status    OrderStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  market        Market       @relation(fields: [marketId], references: [id], onDelete: Cascade)
-  buyTrades     Trade[]      @relation("BuyOrder")
-  sellTrades    Trade[]      @relation("SellOrder")
-  events        OrderEvent[]
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  market     Market       @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  buyTrades  Trade[]      @relation("BuyOrder")
+  sellTrades Trade[]      @relation("SellOrder")
+  events     OrderEvent[]
 
-  @@index([marketId, price(sort: Desc), createdAt]) // For bids
-  @@index([marketId, price(sort: Asc), createdAt])  // For asks
-  @@index([userId, createdAt])
-  @@index([status])
-  @@index([seq])
+  @@index([marketId, outcome, side, price, createdAt])
+  @@index([userId, status])
+  @@index([marketId, status])
 }
 
+// Trade model
 model Trade {
   id          String   @id @default(uuid())
+  marketId    String
   buyOrderId  String
   sellOrderId String
-  marketId    String
+  buyerId     String
+  sellerId    String
+  outcome     Outcome
   price       Decimal  @db.Decimal(18, 4)
-  qty         Decimal  @db.Decimal(18, 4)
+  quantity    Decimal  @db.Decimal(18, 4)
   createdAt   DateTime @default(now())
 
+  market    Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
   buyOrder  Order  @relation("BuyOrder", fields: [buyOrderId], references: [id])
   sellOrder Order  @relation("SellOrder", fields: [sellOrderId], references: [id])
-  market    Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  buyer     User   @relation("UserTrades", fields: [buyerId], references: [id])
 
   @@index([marketId, createdAt])
   @@index([buyOrderId])
   @@index([sellOrderId])
+  @@index([buyerId])
 }
 
+// OrderEvent for audit trail
 model OrderEvent {
-  id              String   @id @default(uuid())
-  orderId         String
-  kind            String
-  payload         Json
-  idempotencyKey  String   @unique
-  createdAt       DateTime @default(now())
+  id        String   @id @default(uuid())
+  orderId   String
+  type      String
+  data      Json
+  createdAt DateTime @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId, createdAt])
 }
 
+// Balance model
 model Balance {
   userId    String   @id
   available Decimal  @default(0) @db.Decimal(18, 4)
   locked    Decimal  @default(0) @db.Decimal(18, 4)
+  total     Decimal  @default(0) @db.Decimal(18, 4)
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// Transfer model for deposits/withdrawals
 model Transfer {
-  id        String   @id @default(uuid())
+  id        String         @id @default(uuid())
   userId    String
-  amount    Decimal  @db.Decimal(18, 4)
-  reason    String
-  createdAt DateTime @default(now())
+  type      TransferType
+  amount    Decimal        @db.Decimal(18, 4)
+  status    TransferStatus @default(PENDING)
+  createdAt DateTime       @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@index([status])
 }
 
+// Position model
 model Position {
+  id           String   @id @default(uuid())
   userId       String
   marketId     String
-  qtyLong      Decimal @default(0) @db.Decimal(18, 4)
-  qtyShort     Decimal @default(0) @db.Decimal(18, 4)
-  avgPrice     Decimal @default(0) @db.Decimal(18, 4)
-  realizedPnl  Decimal @default(0) @db.Decimal(18, 4)
+  outcome      Outcome
+  quantity     Decimal  @default(0) @db.Decimal(18, 4)
+  averagePrice Decimal  @default(0) @db.Decimal(18, 4)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   market Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
 
-  @@id([userId, marketId])
+  @@unique([userId, marketId, outcome])
   @@index([userId])
   @@index([marketId])
 }
 
+// Candle model for price history
 model Candle {
+  id        String   @id @default(uuid())
   marketId  String
+  outcome   Outcome
   timeframe String
-  t         DateTime
+  timestamp DateTime
   open      Decimal  @db.Decimal(18, 4)
   high      Decimal  @db.Decimal(18, 4)
   low       Decimal  @db.Decimal(18, 4)
@@ -198,6 +257,6 @@ model Candle {
 
   market Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
 
-  @@id([marketId, timeframe, t])
-  @@index([marketId, timeframe, t])
+  @@unique([marketId, outcome, timeframe, timestamp])
+  @@index([marketId, outcome, timeframe, timestamp])
 }

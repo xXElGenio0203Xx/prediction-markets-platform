@@ -11,12 +11,28 @@ import metricsPlugin from './plugins/metrics.js';
 import { errorHandler } from './utils/errors.js';
 import { requireAuth, requireAdmin } from './middleware/auth.js';
 import { WebSocketServer } from './websocket/server.js';
+import { MatchingEngine } from './engine/engine.js';
+import type { Redis } from 'ioredis';
 
 // Import routes
-import authRoutes from './routes/auth.js';
-import marketsRoutes from './routes/markets.js';
+import authRoutes from './routes/auth-simple.js';
+import marketsRoutes from './routes/markets-simple.js';
 import ordersRoutes from './routes/orders.js';
 import userRoutes from './routes/user.js';
+import adminRoutes from './routes/admin.js';
+import analyticsRoutes from './routes/analytics.js';
+
+// Extend Fastify types
+declare module 'fastify' {
+  interface FastifyInstance {
+    redis: Redis;
+    config: typeof config;
+    authenticate: typeof requireAuth;
+    requireAdmin: typeof requireAdmin;
+    websocketServer: WebSocketServer;
+    matchingEngine: MatchingEngine;
+  }
+}
 
 const fastify = Fastify({
   logger: {
@@ -63,12 +79,17 @@ await fastify.register(metricsPlugin);
 // Register error handler
 fastify.setErrorHandler(errorHandler);
 
-// Decorate fastify with auth functions
+// Decorate fastify with auth functions and config
 fastify.decorate('authenticate', requireAuth);
 fastify.decorate('requireAdmin', requireAdmin);
+fastify.decorate('config', config);
+
+// Initialize matching engine
+const matchingEngine = new MatchingEngine(fastify.prisma, fastify.log);
+fastify.decorate('matchingEngine', matchingEngine);
 
 // Health check
-fastify.get('/healthz', async (request, reply) => {
+fastify.get('/healthz', async (_request, reply) => {
   try {
     await fastify.prisma.$queryRaw`SELECT 1`;
     await fastify.redis.ping();
@@ -94,6 +115,12 @@ await fastify.register(authRoutes, { prefix: '/api/auth' });
 await fastify.register(marketsRoutes, { prefix: '/api/markets' });
 await fastify.register(ordersRoutes, { prefix: '/api/orders' });
 await fastify.register(userRoutes, { prefix: '/api/user' });
+await fastify.register(adminRoutes, { prefix: '/api/admin' });
+await fastify.register(analyticsRoutes, { prefix: '/api/analytics' });
+
+// Initialize WebSocket server BEFORE listening
+const wsServer = new WebSocketServer(fastify.server, fastify.log, config.CORS_ORIGIN);
+fastify.decorate('websocketServer', wsServer);
 
 // Start server
 try {
@@ -105,10 +132,6 @@ try {
   fastify.log.info(`🚀 Server listening on ${address}`);
   fastify.log.info(`📚 Swagger docs: ${address}/docs`);
   fastify.log.info(`📊 Metrics: ${address}/metrics`);
-
-  // Initialize WebSocket server
-  const wsServer = new WebSocketServer(fastify.server, fastify.log, config.CORS_ORIGIN);
-  fastify.decorate('websocketServer', wsServer);
   fastify.log.info(`🔌 WebSocket server initialized`);
 } catch (err) {
   fastify.log.error(err);

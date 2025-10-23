@@ -1,8 +1,7 @@
 
-import React, { useState, useEffect, useCallback } from "react";
-import { Position } from "@/api/entities";
-import { Market } from "@/api/entities";
-import { Order } from "@/api/entities";
+import React, { useEffect, useState } from "react";
+import { useAuth } from "@/api/hooks";
+import { api } from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,9 +22,7 @@ import {
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { calculatePortfolio } from "@/api/functions";
 import { useMarketUpdates } from "../components/utils/marketUpdates"; // Make sure this path is correct
-import { cancelOrder } from "@/api/functions";
 
 // Helper component to encapsulate the useMarketUpdates hook call
 // This ensures React Hook rules are followed when subscribing to multiple dynamic market IDs.
@@ -51,7 +48,7 @@ export default function PortfolioPage({ user: userFromLayout }) {
       const userId = userEmail;
 
       // Load portfolio calculation
-      const portfolioCalc = await calculatePortfolio({ user_id: userId });
+      const portfolioCalc = await api.getPortfolio();
 
       // Add defensive checks
       if (portfolioCalc && portfolioCalc.data) {
@@ -142,7 +139,7 @@ export default function PortfolioPage({ user: userFromLayout }) {
 
     setCancellingOrder(orderId);
     try {
-      await cancelOrder({ order_id: orderId });
+      await api.cancelOrder(orderId);
       alert('Order cancelled successfully!');
       await loadPortfolioData(user.email);
     } catch (error) {

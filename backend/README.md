@@ -1,6 +1,58 @@
 # Prediction Market Backend
 
-A production-ready, centralized prediction market backend built with Node.js, TypeScript, Fastify, Prisma, PostgreSQL, Redis, and Socket.IO.
+A production-ready, centralized prediction market backend built with Node.js, TypeScript, Fastify, Prisma, PostgreSQL (Supabase), Redis, and Socket.IO.
+
+## 🚀 Quick Start with Supabase
+
+This project uses **Supabase** for PostgreSQL database hosting. Follow these steps:
+
+### 1. Database Setup
+
+```bash
+# Navigate to backend directory
+cd backend
+
+# Run the setup helper (interactive)
+./setup-supabase.sh
+
+# Or manually update .env with your Supabase credentials
+# Get your password from: https://app.supabase.com/project/xsdhkjiskqfelahfariv/settings/database
+```
+
+### 2. Environment Configuration
+
+Update `.env` file:
+```bash
+# Supabase Configuration
+SUPABASE_URL=https://xsdhkjiskqfelahfariv.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+DATABASE_URL=postgresql://postgres.xsdhkjiskqfelahfariv:YOUR_PASSWORD@aws-0-us-east-1.pooler.supabase.com:5432/postgres
+```
+
+### 3. Run Migrations
+
+```bash
+# Install dependencies
+npm install
+
+# Generate Prisma client
+npx prisma generate
+
+# Run migrations
+npx prisma migrate deploy
+
+# Seed database with sample data
+npm run prisma:seed
+```
+
+### 4. Start Development Server
+
+```bash
+npm run dev
+# Server runs on http://localhost:4000
+```
+
+📖 **Full Supabase setup guide**: See [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)
 
 ## Features
 

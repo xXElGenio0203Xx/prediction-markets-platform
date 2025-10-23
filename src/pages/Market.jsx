@@ -1,13 +1,11 @@
 
-import React, { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
-import { Market as MarketEntity } from "@/api/entities";
-import { Order } from "@/api/entities";
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@/api/hooks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Info, TrendingUp, Star, Trophy, Clock, Users, DollarSign } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
@@ -61,7 +59,7 @@ export default function MarketPage({ user }) {
             if (foundMarket) {
               // Add special override for specific markets
               if (foundMarket.title.includes("Michelle Obama be the 2025 commencement speaker")) {
-                foundMarket.image_url = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d2b2a650846fbd3f78c242/2074c7710_ScreenShot2025-09-30at104508AM.png";
+                foundMarket.image_url = "/market-default.svg";
               }
               marketDataForState = foundMarket;
             } else {
@@ -177,7 +175,7 @@ export default function MarketPage({ user }) {
       {/* Bruno Bear Watermark */}
       <div className="fixed bottom-0 right-0 w-[600px] h-[600px] opacity-[0.03] pointer-events-none z-0">
         <img
-          src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d2b2a650846fbd3f78c242/13a135050_e376fe48-a618-426a-81d2-1b4cc1573622.png"
+          src="/logo.svg"
           alt="Bruno Bear"
           className="w-full h-full object-contain"
         />

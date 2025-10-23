@@ -1,7 +1,6 @@
 
-import React, { useState, useEffect } from "react";
-import { Market } from "@/api/entities";
-import { Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -66,12 +65,12 @@ export default function MarketsPage() {
         },
         {
           titleSubstr: "Will the median score of principles of ECON midterm I be above 65?",
-          imageUrl: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d2b2a650846fbd3f78c242/d5936ef42_40870623463_351c7b0f4e_k.jpg",
+          imageUrl: "/market-default.svg",
           overridePrice: null
         },
         {
           titleSubstr: "Will another Bajas open this year?",
-          imageUrl: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d2b2a650846fbd3f78c242/df926de12_ScreenShot2025-09-30at110851AM.png",
+          imageUrl: "/market-default.svg",
           overridePrice: 0.02
         },
       ];
@@ -111,7 +110,7 @@ export default function MarketsPage() {
       <motion.div
         className="relative h-[600px] bg-cover bg-center overflow-hidden"
         style={{ 
-          backgroundImage: "url('https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d2b2a650846fbd3f78c242/fa1d31be3_wwwusnews-1.png')",
+          backgroundImage: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
           backgroundAttachment: 'fixed'
         }}
         initial={{ scale: 1.1 }}
@@ -314,7 +313,7 @@ export default function MarketsPage() {
               </p>
               <div className="w-16 h-16 opacity-30">
                 <img 
-                  src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d2b2a650846fbd3f78c242/1c825b702_8118e423-565f-49d7-912f-088a0f14f398.png"
+                  src="/logo.svg"
                   alt="Brown Crest"
                   className="w-full h-full object-contain"
                 />

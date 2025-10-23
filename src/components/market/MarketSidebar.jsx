@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart3, DollarSign, Users, Activity, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { calculatePortfolio } from "@/api/functions";
+import { api } from "@/api/client";
 
 export default function MarketSidebar({ market, user, orders }) {
   const [portfolioData, setPortfolioData] = useState(null);
@@ -15,20 +15,15 @@ export default function MarketSidebar({ market, user, orders }) {
     }
   }, [user]);
 
-  const loadPortfolio = async () => {
+  async function loadPortfolio() {
     if (!user) return;
-    setIsLoadingPortfolio(true);
     try {
-      const response = await calculatePortfolio({ user_id: user.email });
-      if (response && response.data) {
-        setPortfolioData(response.data);
-      }
+      const { portfolio } = await api.getPortfolio();
+      setPortfolioData(portfolio);
     } catch (error) {
-      console.error("Error loading portfolio:", error);
-      setPortfolioData(null);
+      console.error('Failed to load portfolio:', error);
     }
-    setIsLoadingPortfolio(false);
-  };
+  }
 
   const totalVolume = orders.reduce((sum, o) => {
     if (o.status === 'filled') {

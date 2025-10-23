@@ -51,7 +51,7 @@ const metricsPlugin: FastifyPluginAsync = async (server) => {
     }
   });
 
-  server.get('/metrics', async (request, reply) => {
+  server.get('/metrics', async (_request, reply) => {
     reply.header('Content-Type', register.contentType);
     return register.metrics();
   });

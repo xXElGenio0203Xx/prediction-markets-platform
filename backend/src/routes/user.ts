@@ -1,324 +1,229 @@
-import { FastifyPluginAsync } from 'fastify';
-import {
-  zBalanceResponse,
-  zPositionResponse,
-  zTransferRequest,
-  zPortfolioResponse,
-} from '../contracts/user.js';
-import { validateBody } from '../utils/validate.js';
-import { AppError } from '../utils/errors.js';
+import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
 const userRoutes: FastifyPluginAsync = async (fastify) => {
   // Get user balance
-  fastify.get(
-    '/balance',
-    {
-      schema: {
-        description: 'Get current user balance',
-        tags: ['user'],
-        response: {
-          200: zBalanceResponse,
-        },
-      },
-      preHandler: [fastify.authenticate],
+  fastify.get('/balance', {
+    onRequest: [fastify.authenticate],
+    schema: {
+      tags: ['User'],
+      summary: 'Get user balance',
     },
-    async (request, reply) => {
-      const userId = request.user.sub;
+  }, async (request, reply) => {
+    const userId = request.user!.id;
 
-      const balance = await fastify.prisma.balance.findUnique({
-        where: { userId },
-      });
+    let balance = await fastify.prisma.balance.findUnique({
+      where: { userId },
+    });
 
-      if (!balance) {
-        throw new AppError('BALANCE_NOT_FOUND', 'Balance not found', 404);
-      }
-
-      reply.send({
-        available: Number(balance.available),
-        locked: Number(balance.locked),
-        total: Number(balance.total),
+    // Create balance if it doesn't exist
+    if (!balance) {
+      balance = await fastify.prisma.balance.create({
+        data: {
+          userId,
+          available: 1000, // Starting bonus
+          locked: 0,
+          total: 1000,
+        },
       });
     }
-  );
+
+    return reply.send({
+      balance: {
+        available: balance.available.toNumber(),
+        locked: balance.locked.toNumber(),
+        total: balance.total.toNumber(),
+      },
+    });
+  });
 
   // Get user positions
-  fastify.get(
-    '/positions',
-    {
-      schema: {
-        description: 'Get all user positions across markets',
-        tags: ['user'],
-        response: {
-          200: z.array(zPositionResponse),
+  fastify.get('/positions', {
+    onRequest: [fastify.authenticate],
+    schema: {
+      tags: ['User'],
+      summary: 'Get user positions',
+    },
+  }, async (request, reply) => {
+    const userId = request.user!.id;
+
+    const positions = await fastify.prisma.position.findMany({
+      where: { userId },
+      include: {
+        market: {
+          select: {
+            id: true,
+            slug: true,
+            question: true,
+            imageUrl: true,
+            status: true,
+            yesPrice: true,
+            noPrice: true,
+            outcome: true,
+          },
         },
       },
-      preHandler: [fastify.authenticate],
-    },
-    async (request, reply) => {
-      const userId = request.user.sub;
+    });
 
-      const positions = await fastify.prisma.position.findMany({
-        where: { userId },
-        include: {
-          market: true,
-        },
-      });
+    // Calculate position values
+    const enrichedPositions = positions.map(position => {
+      const currentPrice = position.outcome === 'YES' 
+        ? position.market.yesPrice.toNumber()
+        : position.market.noPrice.toNumber();
+      
+      const quantity = position.quantity.toNumber();
+      const avgPrice = position.averagePrice.toNumber();
+      const currentValue = quantity * currentPrice;
+      const costBasis = quantity * avgPrice;
+      const profitLoss = currentValue - costBasis;
+      const profitLossPercent = costBasis > 0 ? (profitLoss / costBasis) * 100 : 0;
 
-      reply.send(
-        positions.map((p) => ({
-          id: p.id,
-          marketId: p.marketId,
-          marketSlug: p.market.slug,
-          outcome: p.outcome as 'YES' | 'NO',
-          quantity: Number(p.quantity),
-          averagePrice: Number(p.averagePrice),
-          currentPrice:
-            p.outcome === 'YES' ? Number(p.market.yesPrice) : Number(p.market.noPrice),
-          pnl:
-            Number(p.quantity) *
-            ((p.outcome === 'YES' ? Number(p.market.yesPrice) : Number(p.market.noPrice)) -
-              Number(p.averagePrice)),
-        }))
-      );
-    }
-  );
-
-  // Get portfolio summary
-  fastify.get(
-    '/portfolio',
-    {
-      schema: {
-        description: 'Get portfolio summary with P&L',
-        tags: ['user'],
-        response: {
-          200: zPortfolioResponse,
-        },
-      },
-      preHandler: [fastify.authenticate],
-    },
-    async (request, reply) => {
-      const userId = request.user.sub;
-
-      const [balance, positions] = await Promise.all([
-        fastify.prisma.balance.findUnique({
-          where: { userId },
-        }),
-        fastify.prisma.position.findMany({
-          where: { userId },
-          include: { market: true },
-        }),
-      ]);
-
-      if (!balance) {
-        throw new AppError('BALANCE_NOT_FOUND', 'Balance not found', 404);
-      }
-
-      let totalInvested = 0;
-      let currentValue = 0;
-
-      for (const pos of positions) {
-        const invested = Number(pos.quantity) * Number(pos.averagePrice);
-        const current =
-          Number(pos.quantity) *
-          (pos.outcome === 'YES' ? Number(pos.market.yesPrice) : Number(pos.market.noPrice));
-
-        totalInvested += invested;
-        currentValue += current;
-      }
-
-      const totalPnl = currentValue - totalInvested;
-      const totalValue = Number(balance.total) + currentValue;
-
-      reply.send({
-        balance: {
-          available: Number(balance.available),
-          locked: Number(balance.locked),
-          total: Number(balance.total),
-        },
-        positions: positions.map((p) => ({
-          id: p.id,
-          marketId: p.marketId,
-          marketSlug: p.market.slug,
-          outcome: p.outcome as 'YES' | 'NO',
-          quantity: Number(p.quantity),
-          averagePrice: Number(p.averagePrice),
-          currentPrice:
-            p.outcome === 'YES' ? Number(p.market.yesPrice) : Number(p.market.noPrice),
-          pnl:
-            Number(p.quantity) *
-            ((p.outcome === 'YES' ? Number(p.market.yesPrice) : Number(p.market.noPrice)) -
-              Number(p.averagePrice)),
-        })),
-        totalInvested,
+      return {
+        ...position,
+        quantity: quantity,
+        averagePrice: avgPrice,
+        currentPrice,
         currentValue,
-        totalPnl,
+        costBasis,
+        profitLoss,
+        profitLossPercent,
+      };
+    });
+
+    return reply.send({ positions: enrichedPositions });
+  });
+
+  // Get user portfolio summary
+  fastify.get('/portfolio', {
+    onRequest: [fastify.authenticate],
+    schema: {
+      tags: ['User'],
+      summary: 'Get user portfolio summary',
+    },
+  }, async (request, reply) => {
+    const userId = request.user!.id;
+
+    // Get balance
+    const balance = await fastify.prisma.balance.findUnique({
+      where: { userId },
+    });
+
+    // Get positions
+    const positions = await fastify.prisma.position.findMany({
+      where: { userId },
+      include: {
+        market: true,
+      },
+    });
+
+    // Calculate portfolio metrics
+    let totalValue = balance ? balance.available.toNumber() : 0;
+    let totalCostBasis = 0;
+    let openPositionsCount = 0;
+    let totalProfitLoss = 0;
+
+    positions.forEach(position => {
+      const currentPrice = position.outcome === 'YES'
+        ? position.market.yesPrice.toNumber()
+        : position.market.noPrice.toNumber();
+      
+      const quantity = position.quantity.toNumber();
+      const avgPrice = position.averagePrice.toNumber();
+      const positionValue = quantity * currentPrice;
+      const costBasis = quantity * avgPrice;
+      
+      totalValue += positionValue;
+      totalCostBasis += costBasis;
+      totalProfitLoss += (positionValue - costBasis);
+      
+      if (position.market.status === 'OPEN') {
+        openPositionsCount++;
+      }
+    });
+
+    // Get recent trades
+    const recentTrades = await fastify.prisma.trade.findMany({
+      where: {
+        OR: [
+          { buyerId: userId },
+          { sellerId: userId },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      include: {
+        market: {
+          select: {
+            slug: true,
+            question: true,
+          },
+        },
+      },
+    });
+
+    return reply.send({
+      portfolio: {
         totalValue,
-      });
-    }
-  );
+        cashBalance: balance ? balance.available.toNumber() : 0,
+        totalProfitLoss,
+        totalProfitLossPercent: totalCostBasis > 0 ? (totalProfitLoss / totalCostBasis) * 100 : 0,
+        openPositionsCount,
+        totalPositions: positions.length,
+        recentTrades: recentTrades.map(trade => ({
+          ...trade,
+          price: trade.price.toNumber(),
+          quantity: trade.quantity.toNumber(),
+        })),
+      },
+    });
+  });
 
-  // Deposit funds (for testing/development)
-  fastify.post(
-    '/deposit',
-    {
-      schema: {
-        description: 'Deposit funds (for testing/development)',
-        tags: ['user'],
-        body: zTransferRequest,
-        response: {
-          200: zBalanceResponse,
+  // Get leaderboard
+  fastify.get('/leaderboard', {
+    schema: {
+      tags: ['User'],
+      summary: 'Get leaderboard',
+      // Zod schemas removed - validation done manually
+    },
+  }, async (request, reply) => {
+    const { limit } = request.query as { limit: number };
+
+    // Get all users with balances and calculate portfolio values
+    const users = await fastify.prisma.user.findMany({
+      include: {
+        balance: true,
+        positions: {
+          include: {
+            market: true,
+          },
         },
       },
-      preHandler: [fastify.authenticate, validateBody(zTransferRequest)],
-    },
-    async (request, reply) => {
-      const userId = request.user.sub;
-      const { amount } = request.body;
+    });
 
-      if (amount <= 0) {
-        throw new AppError('INVALID_AMOUNT', 'Amount must be positive', 400);
-      }
-
-      // In production, this would integrate with payment gateway
-      // For now, just update balance
-      const balance = await fastify.prisma.$transaction(async (tx) => {
-        // Create transfer record
-        await tx.transfer.create({
-          data: {
-            userId,
-            type: 'DEPOSIT',
-            amount,
-            status: 'COMPLETED',
-          },
-        });
-
-        // Update balance
-        const updated = await tx.balance.update({
-          where: { userId },
-          data: {
-            available: { increment: amount },
-            total: { increment: amount },
-          },
-        });
-
-        return updated;
+    const leaderboard = users.map(user => {
+      let portfolioValue = user.balance ? user.balance.total.toNumber() : 0;
+      
+      // Add position values
+      user.positions.forEach(position => {
+        const currentPrice = position.outcome === 'YES'
+          ? position.market.yesPrice.toNumber()
+          : position.market.noPrice.toNumber();
+        portfolioValue += position.quantity.toNumber() * currentPrice;
       });
 
-      reply.send({
-        available: Number(balance.available),
-        locked: Number(balance.locked),
-        total: Number(balance.total),
-      });
-    }
-  );
+      return {
+        userId: user.id,
+        handle: user.handle || user.email.split('@')[0],
+        fullName: user.fullName,
+        portfolioValue,
+        totalPositions: user.positions.length,
+      };
+    })
+    .sort((a, b) => b.portfolioValue - a.portfolioValue)
+    .slice(0, limit);
 
-  // Withdraw funds (for testing/development)
-  fastify.post(
-    '/withdraw',
-    {
-      schema: {
-        description: 'Withdraw funds (for testing/development)',
-        tags: ['user'],
-        body: zTransferRequest,
-        response: {
-          200: zBalanceResponse,
-        },
-      },
-      preHandler: [fastify.authenticate, validateBody(zTransferRequest)],
-    },
-    async (request, reply) => {
-      const userId = request.user.sub;
-      const { amount } = request.body;
-
-      if (amount <= 0) {
-        throw new AppError('INVALID_AMOUNT', 'Amount must be positive', 400);
-      }
-
-      const balance = await fastify.prisma.balance.findUnique({
-        where: { userId },
-      });
-
-      if (!balance || balance.available < amount) {
-        throw new AppError('INSUFFICIENT_BALANCE', 'Insufficient available balance', 400);
-      }
-
-      const updated = await fastify.prisma.$transaction(async (tx) => {
-        // Create transfer record
-        await tx.transfer.create({
-          data: {
-            userId,
-            type: 'WITHDRAWAL',
-            amount,
-            status: 'COMPLETED',
-          },
-        });
-
-        // Update balance
-        const updatedBalance = await tx.balance.update({
-          where: { userId },
-          data: {
-            available: { decrement: amount },
-            total: { decrement: amount },
-          },
-        });
-
-        return updatedBalance;
-      });
-
-      reply.send({
-        available: Number(updated.available),
-        locked: Number(updated.locked),
-        total: Number(updated.total),
-      });
-    }
-  );
-
-  // Get transaction history
-  fastify.get(
-    '/transactions',
-    {
-      schema: {
-        description: 'Get user transaction history',
-        tags: ['user'],
-        querystring: z.object({
-          limit: z.coerce.number().min(1).max(100).default(50),
-        }),
-        response: {
-          200: z.array(
-            z.object({
-              id: z.string(),
-              type: z.enum(['DEPOSIT', 'WITHDRAWAL']),
-              amount: z.number(),
-              status: z.enum(['PENDING', 'COMPLETED', 'FAILED']),
-              createdAt: z.string(),
-            })
-          ),
-        },
-      },
-      preHandler: [fastify.authenticate],
-    },
-    async (request, reply) => {
-      const userId = request.user.sub;
-      const { limit = 50 } = request.query as { limit?: number };
-
-      const transfers = await fastify.prisma.transfer.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-      });
-
-      reply.send(
-        transfers.map((t) => ({
-          id: t.id,
-          type: t.type as 'DEPOSIT' | 'WITHDRAWAL',
-          amount: Number(t.amount),
-          status: t.status as 'PENDING' | 'COMPLETED' | 'FAILED',
-          createdAt: t.createdAt.toISOString(),
-        }))
-      );
-    }
-  );
+    return reply.send({ leaderboard });
+  });
 };
 
 export default userRoutes;

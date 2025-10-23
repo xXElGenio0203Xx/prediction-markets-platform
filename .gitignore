@@ -24,3 +24,11 @@ dist-ssr
 *.sw?
 
 .env
+# Environment files (contain secrets)
+backend/.env
+
+# Backup files
+*.bak
+*.tmp
+*.swp
+*~

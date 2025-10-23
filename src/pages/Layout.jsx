@@ -3,9 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { User } from "@/api/entities";
-import { Position } from "@/api/entities";
-import { TrendingUp, BarChart3, Trophy, Menu, X, Send, BookOpen, User as UserIcon, LogIn, DollarSign } from "lucide-react";
+import { TrendingUp, BarChart3, Trophy, Menu, X, Send, BookOpen, User as UserIcon, LogIn, DollarSign, LineChart, Activity, History, BarChart2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -16,11 +14,13 @@ import {
 } from "@/components/ui/sheet";
 import MoneyFall from "../components/animations/MoneyFall";
 import { motion, AnimatePresence } from "framer-motion";
-import { ensureUserBonus } from "@/api/functions";
+import { api } from "@/api/client";
 
 const navigationItems = [
   { title: "Markets", url: createPageUrl("Markets"), icon: TrendingUp },
   { title: "Portfolio", url: createPageUrl("Portfolio"), icon: BarChart3 },
+  { title: "Analytics", url: createPageUrl("PortfolioAnalytics"), icon: LineChart },
+  { title: "Trade History", url: createPageUrl("TradeHistory"), icon: History },
   { title: "Request Market", url: createPageUrl("RequestMarket"), icon: Send },
   { title: "Leaderboard", url: createPageUrl("Leaderboard"), icon: Trophy },
   { title: "Learn More", url: createPageUrl("LearnMore"), icon: BookOpen },
@@ -163,7 +163,7 @@ export default function Layout({ children, currentPageName }) {
             <Link to={createPageUrl("Markets")} className="flex items-center gap-3 group">
               <div className="w-10 h-10 bg-gradient-to-br from-[#A97142] to-[#CD853F] rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
                 <img 
-                  src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d2b2a650846fbd3f78c242/1c825b702_8118e423-565f-49d7-912f-088a0f14f398.png" 
+                  src="https://picsum.photos/seed/logo/100/100" 
                   alt="Bruno Exchange" 
                   className="w-6 h-6 object-contain"
                 />
@@ -239,7 +239,7 @@ export default function Layout({ children, currentPageName }) {
                   <SheetHeader className="pb-6 border-b border-[#4E3629]/10">
                     <SheetTitle className="flex items-center gap-3 text-xl text-[#4E3629]">
                       <img 
-                        src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d2b2a650846fbd3f78c242/1c825b702_8118e423-565f-49d7-912f-088a0f14f398.png" 
+                        src="/logo.svg" 
                         alt="Bruno Exchange" 
                         className="w-10 h-10 object-contain" 
                       />
@@ -333,7 +333,7 @@ export default function Layout({ children, currentPageName }) {
         {/* Bear Watermark */}
         <div className="absolute bottom-0 right-0 w-96 h-96 opacity-[0.03] pointer-events-none">
           <img 
-            src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d2b2a650846fbd3f78c242/13a135050_e376fe48-a618-426a-81d2-1b4cc1573622.png"
+            src="/bonus-coin.svg"
             alt="Bruno Bear"
             className="w-full h-full object-contain"
           />
@@ -371,7 +371,7 @@ export default function Layout({ children, currentPageName }) {
               </p>
               <div className="w-16 h-16 opacity-30">
                 <img 
-                  src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d2b2a650846fbd3f78c242/1c825b702_8118e423-565f-49d7-912f-088a0f14f398.png"
+                  src="https://picsum.photos/seed/logo/100/100"
                   alt="Brown Crest"
                   className="w-full h-full object-contain"
                 />

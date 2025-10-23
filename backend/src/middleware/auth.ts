@@ -1,6 +1,6 @@
 // src/middleware/auth.ts
-import { FastifyRequest, FastifyReply, preHandlerHookHandler } from 'fastify';
-import { sign, verify } from '@fastify/jwt';
+import { FastifyRequest, preHandlerHookHandler } from 'fastify';
+import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 import { AppError } from '../utils/errors.js';
 import { User } from '@prisma/client';
@@ -12,49 +12,48 @@ declare module 'fastify' {
   }
 }
 
-export function generateTokens(userId: string) {
-  const accessToken = sign(
-    { userId, type: 'access' },
+export function generateTokens(userId: string, email: string, role: string) {
+  const accessToken = jwt.sign(
+    { sub: userId, email, role, type: 'access' },
     config.JWT_SECRET,
-    { expiresIn: config.JWT_ACCESS_EXPIRY }
+    { expiresIn: config.JWT_ACCESS_EXPIRY } as jwt.SignOptions
   );
 
-  const refreshToken = sign(
-    { userId, type: 'refresh' },
+  const refreshToken = jwt.sign(
+    { sub: userId, type: 'refresh' },
     config.JWT_REFRESH_SECRET,
-    { expiresIn: config.JWT_REFRESH_EXPIRY }
+    { expiresIn: config.JWT_REFRESH_EXPIRY } as jwt.SignOptions
   );
 
   return { accessToken, refreshToken };
 }
 
-export function verifyAccessToken(token: string): { userId: string } {
+export function verifyAccessToken(token: string): { sub: string; email: string; role: string } {
   try {
-    const payload = verify(token, config.JWT_SECRET) as { userId: string; type: string };
+    const payload = jwt.verify(token, config.JWT_SECRET) as { sub: string; email: string; role: string; type: string };
     if (payload.type !== 'access') {
       throw new Error('Invalid token type');
     }
-    return { userId: payload.userId };
+    return { sub: payload.sub, email: payload.email, role: payload.role };
   } catch (error) {
     throw new AppError('INVALID_TOKEN', 401, 'Invalid or expired access token');
   }
 }
 
-export function verifyRefreshToken(token: string): { userId: string } {
+export function verifyRefreshToken(token: string): { sub: string } {
   try {
-    const payload = verify(token, config.JWT_REFRESH_SECRET) as { userId: string; type: string };
+    const payload = jwt.verify(token, config.JWT_REFRESH_SECRET) as { sub: string; type: string };
     if (payload.type !== 'refresh') {
       throw new Error('Invalid token type');
     }
-    return { userId: payload.userId };
+    return { sub: payload.sub };
   } catch (error) {
     throw new AppError('INVALID_TOKEN', 401, 'Invalid or expired refresh token');
   }
 }
 
 export const requireAuth: preHandlerHookHandler = async (
-  request: FastifyRequest,
-  reply: FastifyReply
+  request: FastifyRequest
 ) => {
   let token: string | undefined;
 
@@ -74,9 +73,9 @@ export const requireAuth: preHandlerHookHandler = async (
   }
 
   try {
-    const { userId } = verifyAccessToken(token);
+    const { sub } = verifyAccessToken(token);
     const user = await request.server.prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: sub },
     });
 
     if (!user) {
@@ -93,8 +92,7 @@ export const requireAuth: preHandlerHookHandler = async (
 };
 
 export const requireAdmin: preHandlerHookHandler = async (
-  request: FastifyRequest,
-  reply: FastifyReply
+  request: FastifyRequest
 ) => {
   if (!request.user) {
     throw new AppError('UNAUTHORIZED', 401, 'Authentication required');

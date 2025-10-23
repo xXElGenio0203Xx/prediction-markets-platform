@@ -1,9 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Order } from "@/api/entities";
-import { Position } from "@/api/entities";
-import { Market as MarketEntity } from "@/api/entities";
-import { User } from "@/api/entities";
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { ShoppingCart, AlertCircle, CheckCircle, TrendingUp, TrendingDown, Info } from 'lucide-react';
 import { motion, AnimatePresence } from "framer-motion";
-import { broadcastMarketUpdate } from "@/api/functions";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { base44 } from "@/api/base44Client";
 
 export default function TradeWidget({ market, user, onOrderPlaced, selectedOutcome, onOutcomeChange }) {
   const [probability, setProbability] = useState(50); // Represents price as a percentage
@@ -65,23 +60,10 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
     loadPositions();
   }, [currentUser, market.id, lastOrderStatus]); // Reload positions when user changes, market changes, or an order status updates
 
-  // ADDED: fetch fee config for estimate
+  // TODO: Implement fee configuration endpoint
+  // For now, fees are disabled (set to 0)
   useEffect(() => {
-    let cancelled = false;
-    async function loadFeeCfg() {
-      try {
-        if (!market?.id) return;
-        const { data } = await base44.functions.invoke('getFeeConfig', { market_id: market.id });
-        if (!cancelled) {
-          setFeeCfg(data?.config || { maker_bps: 0, taker_bps: 0, per_contract_fee: 0 });
-        }
-      } catch (error) {
-        console.error("Failed to fetch fee config:", error);
-        if (!cancelled) setFeeCfg({ maker_bps: 0, taker_bps: 0, per_contract_fee: 0 });
-      }
-    }
-    loadFeeCfg();
-    return () => { cancelled = true; };
+    setFeeCfg({ maker_bps: 0, taker_bps: 0, per_contract_fee: 0 });
   }, [market?.id]);
 
   // Calculate total contracts in this market (absolute value of shares for both YES/NO)
@@ -197,20 +179,9 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
               console.log("Could not update market:", marketError);
             }
 
-            // ADDED: APPLY FEES FOR THIS EXECUTION
-            try {
-              await base44.functions.invoke('applyClobFees', {
-                market_id: newOrder.market_id,
-                price: executionPrice,
-                quantity: executableQuantity,
-                buy_user_id: newOrder.side === 'buy' ? newOrder.user_id : matchingOrder.user_id,
-                sell_user_id: newOrder.side === 'sell' ? newOrder.user_id : matchingOrder.user_id,
-                resting_side: matchingOrder.side.toUpperCase(),
-                trade_id: newOrder.id // Using newOrder.id as the trade ID
-              });
-            } catch (feeErr) {
-              console.log("Fee application failed (non-blocking):", feeErr?.response?.data || feeErr.message);
-            }
+            // TODO: Implement fee application endpoint
+            // Fees are currently disabled in the new architecture
+            // await api.post('/fees/apply', { ... })
 
             executions.push({
               price: executionPrice,
@@ -386,39 +357,13 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
         
         console.log('✅ Order placed successfully:', newOrder.id);
 
-        // Broadcast order placed
-        try {
-          await broadcastMarketUpdate({
-            market_id: market.id,
-            event_type: 'order_placed',
-            data: {
-              order_id: newOrder.id,
-              side: side,
-              outcome: selectedOutcome,
-              probability: probability,
-              quantity: numQuantity
-            }
-          });
-        } catch (broadcastError) {
-          console.log('Failed to broadcast order placed event:', broadcastError);
-        }
-
+        // Order placed - backend will broadcast via WebSocket
+        
         // Try to match and execute
         const matchResult = await matchAndExecuteOrders(newOrder);
 
         if (matchResult.filledQuantity > 0) {
-          try {
-            await broadcastMarketUpdate({
-              market_id: market.id,
-              event_type: 'trade_executed',
-              data: {
-                filled_quantity: matchResult.filledQuantity,
-                executions: matchResult.executionDetails
-              }
-            });
-          } catch (broadcastError) {
-            console.log('Failed to broadcast execution event:', broadcastError);
-          }
+          // Trade executed - backend will broadcast via WebSocket
         }
 
         // Success message

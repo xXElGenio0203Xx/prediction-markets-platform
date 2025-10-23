@@ -1,0 +1,66 @@
+feat: Add CLOB matching engine and comprehensive analytics dashboard
+
+Major Features Added:
+
+1. Central Limit Order Book (CLOB) Matching Engine
+   - Limit and market order support
+   - Price-time priority matching algorithm
+   - Self-trade prevention (STP)
+   - Real-time order book depth tracking
+   - WebSocket real-time updates for trades
+
+2. Analytics Dashboard (4 New Pages)
+   - Portfolio Analytics: P&L tracking, win rate, Sharpe ratio, diversification score
+   - Market Analytics: Order book heatmap, volume profile, liquidity depth, probability trends
+   - Trade History: Filterable log with CSV export, P&L attribution, fee breakdown
+   - Platform Metrics: DAU/MAU, volume tracking, liquidity analysis (admin only)
+
+3. Local Development Infrastructure
+   - Docker Compose for PostgreSQL + Redis (no cloud services needed)
+   - Prisma ORM with migrations
+   - Seeded test data with admin and user accounts
+   - Comprehensive setup documentation
+
+Technical Changes:
+
+Backend:
+- Added analytics API routes (/api/analytics/*)
+- Enhanced matching engine with order book management
+- Updated Prisma schema for analytics queries
+- Fixed Fastify schema validation issues
+- Added admin-only middleware for protected endpoints
+
+Frontend:
+- Integrated recharts for data visualization
+- Added 4 new analytics pages with interactive charts
+- Enhanced API client with analytics methods
+- Updated navigation with Analytics and Trade History links
+- Fixed API URL configuration (port 4000)
+
+Documentation:
+- LOCALHOST_QUICKSTART.md - Quick setup guide for team
+- ANALYTICS_IMPLEMENTATION.md - Analytics deep dive
+- CLOB_IMPLEMENTATION.md - Trading engine details
+- TEAM_README.md - Branch overview for colleagues
+- PRE_COMMIT_CHECKLIST.md - Safekeeping guidelines
+- Updated .env.example files with local dev defaults
+
+Setup Instructions:
+1. docker-compose -f backend/docker-compose.yml up -d
+2. cp backend/.env.example backend/.env
+3. cd backend && npx prisma db push && npm run prisma:seed
+4. cp .env.example .env
+5. See LOCALHOST_QUICKSTART.md for details
+
+Test Accounts:
+- Admin: admin@browncast.com / admin123456
+- Users: alice@example.com / password123 (also bob, charlie)
+
+Breaking Changes:
+- Backend now requires PostgreSQL and Redis
+- New environment variables (see .env.example)
+- Database schema updated (migrations required)
+- Frontend API URL changed to port 4000
+
+Files Changed: 40+ files modified/added
+Lines of Code: ~3,000+ new lines

@@ -14,7 +14,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getLeaderboard } from "@/api/functions";
+import { api } from "@/api/client";
 
 export default function LeaderboardPage() {
   const [leaderboard, setLeaderboard] = useState([]);

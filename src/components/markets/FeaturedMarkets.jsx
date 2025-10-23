@@ -14,7 +14,7 @@ const CarouselCard = ({ market }) => (
     <div 
       className="relative h-48 bg-cover bg-center"
       style={{
-        backgroundImage: `url('${market.image_url || "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d2b2a650846fbd3f78c242/89294bef3_20201031_COMM_snowyoct0092.jpg"}')`
+        backgroundImage: `url('${market.image_url || "/market-default.svg"}')`
       }}
     >
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />

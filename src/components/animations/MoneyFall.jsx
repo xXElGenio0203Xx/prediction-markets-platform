@@ -38,7 +38,7 @@ const BearParticle = ({ x, delay, duration, size, opacity }) => (
       }}
     >
       <img 
-        src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d2b2a650846fbd3f78c242/13a135050_e376fe48-a618-426a-81d2-1b4cc1573622.png" 
+        src="/bonus-coin.svg" 
         alt="Falling Bear"
         style={{
             width: size,

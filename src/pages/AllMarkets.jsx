@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-import { Market } from "@/api/entities";
+import React, { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Card, CardContent } from "@/components/ui/card";
