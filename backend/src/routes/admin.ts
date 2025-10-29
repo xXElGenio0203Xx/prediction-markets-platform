@@ -1,5 +1,4 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { z } from 'zod';
 
 const adminRoutes: FastifyPluginAsync = async (fastify) => {
   // Resolve a market
