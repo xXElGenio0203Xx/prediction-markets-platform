@@ -1,5 +1,4 @@
-import type { FastifyPluginAsync } from 'fastify';
-import { z } from 'zod';
+import { FastifyPluginAsync } from 'fastify';
 
 const userRoutes: FastifyPluginAsync = async (fastify) => {
   // Get user balance
