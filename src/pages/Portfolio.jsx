@@ -41,41 +41,22 @@ export default function PortfolioPage({ user: userFromLayout }) {
   const [activeMarketIds, setActiveMarketIds] = useState([]);
   const [cancellingOrder, setCancellingOrder] = useState(null);
 
-  // Memoize loadPortfolioData to make it stable for dependencies in other hooks
-  const loadPortfolioData = useCallback(async (userEmail) => {
+  // Load portfolio data
+  const loadPortfolioData = async () => {
     setIsLoading(true);
     try {
-      const userId = userEmail;
-
-      // Load portfolio calculation
-      const portfolioCalc = await api.getPortfolio();
-
-      // Add defensive checks
-      if (portfolioCalc && portfolioCalc.data) {
-        setPortfolioData(portfolioCalc.data);
-      } else if (portfolioCalc) {
-        // Handle case where response is direct object, not wrapped in data
-        setPortfolioData(portfolioCalc);
-      } else {
-        // Set default portfolio data
-        setPortfolioData({
-          cash_balance: 100,
-          portfolio_value: 100,
-          unrealized_pnl: 0,
-          total_return: 0,
-          total_trades: 0,
-          position_count: 0,
-          positions: []
-        });
-      }
-
       // Load positions
-      const positionsData = await Position.filter({ user_id: userId });
+      const positionsResponse = await api.getPositions();
+      const positionsData = positionsResponse.positions || [];
       setPositions(positionsData);
+
+      // Load portfolio summary
+      const portfolioResponse = await api.getPortfolio();
+      setPortfolioData(portfolioResponse.summary || {});
 
       // Track which markets user has positions in for realtime updates
       if (positionsData && positionsData.length > 0) {
-        const marketIds = [...new Set(positionsData.map(p => p.market_id))];
+        const marketIds = [...new Set(positionsData.map(p => p.marketId))];
         setActiveMarketIds(marketIds);
       } else {
         setActiveMarketIds([]); // Clear if no positions
@@ -106,31 +87,24 @@ export default function PortfolioPage({ user: userFromLayout }) {
   }, [setIsLoading, setPositions, setOrders, setMarkets, setPortfolioData, setActiveMarketIds]); // All state setters are stable
 
   useEffect(() => {
-    setIsLoading(true);
-    setPositions([]);
-    setOrders([]);
-    setMarkets([]);
-    setPortfolioData(null);
-    setActiveMarketIds([]); // Clear active market IDs on user change/logout
-
     if (userFromLayout) {
       setUser(userFromLayout);
-      loadPortfolioData(userFromLayout.email);
+      loadPortfolioData();
     } else {
       setUser(null);
       setIsLoading(false);
     }
-  }, [userFromLayout, loadPortfolioData]); // loadPortfolioData is now a stable dependency
+  }, [userFromLayout]);
 
   // Callback for handling real-time market updates
-  const handlePortfolioUpdate = useCallback((update) => {
+  const handlePortfolioUpdate = (update) => {
     console.log('📊 Portfolio update received:', update);
 
     // Reload portfolio when trades happen in user's markets or market data changes
     if (user && (update.type === 'trade_executed' || update.type === 'market_updated')) {
-      loadPortfolioData(user.email);
+      loadPortfolioData();
     }
-  }, [user, loadPortfolioData]);
+  };
 
   const handleCancelOrder = async (orderId) => {
     if (!confirm('Are you sure you want to cancel this order?')) {
@@ -152,7 +126,7 @@ export default function PortfolioPage({ user: userFromLayout }) {
   const statsCards = portfolioData ? [
     {
       title: "Cash Balance",
-      value: `$${(portfolioData.cash_balance || 0).toFixed(2)}`,
+      value: `$${(portfolioData.availableBalance || 0).toFixed(2)}`,
       subtext: "Bruno Dollars",
       icon: Wallet,
       color: "text-blue-600",
@@ -161,26 +135,26 @@ export default function PortfolioPage({ user: userFromLayout }) {
     },
     {
       title: "Portfolio Value",
-      value: `$${(portfolioData.portfolio_value || 0).toFixed(2)}`,
-      subtext: (portfolioData.total_return || 0) >= 0 ? `+${(portfolioData.total_return || 0).toFixed(1)}%` : `${(portfolioData.total_return || 0).toFixed(1)}%`,
-      icon: (portfolioData.total_return || 0) >= 0 ? TrendingUp : TrendingDown,
-      color: (portfolioData.total_return || 0) >= 0 ? "text-green-600" : "text-red-600",
-      bgColor: (portfolioData.total_return || 0) >= 0 ? "bg-green-100" : "bg-red-100",
-      borderColor: (portfolioData.total_return || 0) >= 0 ? "border-green-300" : "border-red-300"
+      value: `$${(portfolioData.totalValue || 0).toFixed(2)}`,
+      subtext: (portfolioData.portfolioReturn || 0) >= 0 ? `+${(portfolioData.portfolioReturn || 0).toFixed(1)}%` : `${(portfolioData.portfolioReturn || 0).toFixed(1)}%`,
+      icon: (portfolioData.portfolioReturn || 0) >= 0 ? TrendingUp : TrendingDown,
+      color: (portfolioData.portfolioReturn || 0) >= 0 ? "text-green-600" : "text-red-600",
+      bgColor: (portfolioData.portfolioReturn || 0) >= 0 ? "bg-green-100" : "bg-red-100",
+      borderColor: (portfolioData.portfolioReturn || 0) >= 0 ? "border-green-300" : "border-red-300"
     },
     {
       title: "Unrealized P/L",
-      value: `$${(portfolioData.unrealized_pnl || 0).toFixed(2)}`,
+      value: `$${(portfolioData.totalProfitLoss || 0).toFixed(2)}`,
       subtext: "Marked to market",
-      icon: (portfolioData.unrealized_pnl || 0) >= 0 ? ArrowUpRight : ArrowDownRight,
-      color: (portfolioData.unrealized_pnl || 0) >= 0 ? "text-green-600" : "text-red-600",
-      bgColor: (portfolioData.unrealized_pnl || 0) >= 0 ? "bg-green-100" : "bg-red-100",
-      borderColor: (portfolioData.unrealized_pnl || 0) >= 0 ? "border-green-300" : "border-red-300"
+      icon: (portfolioData.totalProfitLoss || 0) >= 0 ? ArrowUpRight : ArrowDownRight,
+      color: (portfolioData.totalProfitLoss || 0) >= 0 ? "text-green-600" : "text-red-600",
+      bgColor: (portfolioData.totalProfitLoss || 0) >= 0 ? "bg-green-100" : "bg-red-100",
+      borderColor: (portfolioData.totalProfitLoss || 0) >= 0 ? "border-green-300" : "border-red-300"
     },
     {
-      title: "Total Trades",
-      value: (portfolioData.total_trades || 0).toString(),
-      subtext: `${portfolioData.position_count || 0} positions`,
+      title: "Open Positions",
+      value: (portfolioData.openPositionsCount || 0).toString(),
+      subtext: `${portfolioData.totalPositionsCount || 0} total`,
       icon: BarChart3,
       color: "text-amber-600",
       bgColor: "bg-amber-100",
