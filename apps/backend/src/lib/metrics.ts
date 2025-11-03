@@ -55,3 +55,15 @@ export const databaseQueryDuration = new Histogram({
 
 // Export Prometheus registry
 export { register };
+
+// Register metrics endpoint
+export function registerMetrics(app: any) {
+  app.get('/metrics', async (request: any, reply: any) => {
+    try {
+      const metrics = await register.metrics();
+      reply.type('text/plain').send(metrics);
+    } catch (err) {
+      reply.code(500).send({ error: 'Failed to get metrics' });
+    }
+  });
+}

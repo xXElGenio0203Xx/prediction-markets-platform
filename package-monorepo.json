@@ -1,0 +1,40 @@
+{
+  "name": "brunoexchange-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BrunoExchange - Prediction Markets Platform Monorepo",
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"@prediction-markets/*\" dev",
+    "dev:backend": "pnpm --filter @prediction-markets/backend dev",
+    "dev:frontend": "pnpm --filter @prediction-markets/frontend dev",
+    "build": "pnpm --filter @prediction-markets/shared build && pnpm --parallel --filter \"./apps/*\" build",
+    "build:backend": "pnpm --filter @prediction-markets/backend build",
+    "build:frontend": "pnpm --filter @prediction-markets/frontend build",
+    "build:shared": "pnpm --filter @prediction-markets/shared build",
+    "test": "pnpm --parallel --filter \"@prediction-markets/*\" test",
+    "test:backend": "pnpm --filter @prediction-markets/backend test",
+    "lint": "pnpm --parallel --filter \"@prediction-markets/*\" lint",
+    "lint:fix": "pnpm --parallel --filter \"@prediction-markets/*\" lint:fix",
+    "type-check": "pnpm --parallel --filter \"@prediction-markets/*\" type-check",
+    "clean": "pnpm --parallel --filter \"@prediction-markets/*\" clean && rm -rf node_modules",
+    "prisma:generate": "pnpm --filter @prediction-markets/backend prisma:generate",
+    "prisma:migrate": "pnpm --filter @prediction-markets/backend prisma:migrate",
+    "prisma:migrate:dev": "pnpm --filter @prediction-markets/backend prisma:migrate:dev",
+    "prisma:studio": "pnpm --filter @prediction-markets/backend prisma:studio",
+    "prisma:seed": "pnpm --filter @prediction-markets/backend prisma:seed",
+    "deploy:backend": "cd apps/backend && flyctl deploy",
+    "deploy:frontend": "cd apps/frontend && vercel --prod",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
+    "prepare": "pnpm --filter @prediction-markets/shared build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "prettier": "^3.2.5",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

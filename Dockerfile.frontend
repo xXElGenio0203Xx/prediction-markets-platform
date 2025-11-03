@@ -1,0 +1,35 @@
+# Development Dockerfile for Frontend
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm@9
+
+# Copy package files
+COPY package.json pnpm-workspace.yaml ./
+COPY packages/shared/package.json ./packages/shared/
+COPY apps/frontend/package.json ./apps/frontend/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source
+COPY packages/shared ./packages/shared
+COPY apps/frontend ./apps/frontend
+COPY src ./src
+COPY public ./public
+COPY index.html ./
+COPY vite.config.js ./
+COPY tailwind.config.js ./
+COPY postcss.config.js ./
+COPY components.json ./
+
+# Build shared package
+RUN cd packages/shared && pnpm build
+
+# Expose port
+EXPOSE 5173
+
+# Start dev server
+CMD ["pnpm", "dev", "--host", "0.0.0.0"]

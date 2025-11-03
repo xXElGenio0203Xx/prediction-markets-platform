@@ -6,7 +6,7 @@ import fastifyJwt from '@fastify/jwt';
 import { Server as SocketIOServer } from 'socket.io';
 import { createServer } from 'http';
 import { config } from './config.js';
-import { redis, CHANNELS } from './lib/redis.js';
+import { redis, subscriber, CHANNELS } from './lib/redis.js';
 import { limiter, wsLimiter } from './lib/rate-limit.js';
 import { prisma } from './lib/prisma.js';
 import { initSentry } from './lib/sentry.js';
@@ -146,11 +146,13 @@ const registerRoutes = async () => {
   const marketsRoutes = await import('./routes/markets.js');
   const ordersRoutes = await import('./routes/orders.js');
   const userRoutes = await import('./routes/user.js');
+  const adminRoutes = await import('./routes/admin.js');
 
   await app.register(authRoutes.default, { prefix: '/api/auth' });
   await app.register(marketsRoutes.default, { prefix: '/api/markets' });
   await app.register(ordersRoutes.default, { prefix: '/api/orders' });
   await app.register(userRoutes.default, { prefix: '/api/user' });
+  await app.register(adminRoutes.default, { prefix: '/api/admin' });
 };
 
 await registerRoutes();
@@ -252,9 +254,6 @@ io.on('connection', (socket) => {
 });
 
 // Redis pub/sub → Socket.IO bridge
-const subscriber = redis.duplicate();
-await subscriber.connect();
-
 subscriber.subscribe(CHANNELS.ORDERBOOK, (message) => {
   try {
     const data = JSON.parse(message);
