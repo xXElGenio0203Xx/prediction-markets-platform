@@ -59,32 +59,23 @@ export default function PortfolioPage({ user: userFromLayout }) {
         const marketIds = [...new Set(positionsData.map(p => p.marketId))];
         setActiveMarketIds(marketIds);
       } else {
-        setActiveMarketIds([]); // Clear if no positions
+        setActiveMarketIds([]);
       }
-
-      // Load orders
-      const ordersData = await Order.filter({ user_id: userId });
-      setOrders(ordersData);
-
-      // Load markets
-      const marketsData = await Market.list();
-      setMarkets(marketsData);
     } catch (error) {
       console.error("Error loading portfolio:", error);
       // Set default portfolio data on error
       setPortfolioData({
-        cash_balance: 100,
-        portfolio_value: 100,
-        unrealized_pnl: 0,
-        total_return: 0,
-        total_trades: 0,
-        position_count: 0,
-        positions: []
+        availableBalance: 0,
+        totalValue: 0,
+        totalProfitLoss: 0,
+        portfolioReturn: 0,
+        openPositionsCount: 0,
+        totalPositionsCount: 0
       });
-      setActiveMarketIds([]); // Clear on error
+      setActiveMarketIds([]);
     }
     setIsLoading(false);
-  }, [setIsLoading, setPositions, setOrders, setMarkets, setPortfolioData, setActiveMarketIds]); // All state setters are stable
+  };
 
   useEffect(() => {
     if (userFromLayout) {
