@@ -1,7 +1,8 @@
 
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/api/hooks";
+import { api } from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,49 +46,62 @@ export default function MarketPage({ user }) {
     const fetchMarketData = async () => {
       setIsLoading(true);
       const searchParams = new URLSearchParams(location.search);
-      const marketId = searchParams.get('id');
+      const marketSlug = searchParams.get('slug') || searchParams.get('id');
 
-      let marketDataForState = null;
-      let ordersForState = [];
-      let userOrdersForState = [];
+      console.log('📊 Market: Loading market with slug:', marketSlug);
 
       try {
-        if (marketId) {
-            const allMarkets = await MarketEntity.list();
-            const foundMarket = allMarkets.find(m => m.id === marketId);
-
-            if (foundMarket) {
-              // Add special override for specific markets
-              if (foundMarket.title.includes("Michelle Obama be the 2025 commencement speaker")) {
-                foundMarket.image_url = "/market-default.svg";
-              }
-              marketDataForState = foundMarket;
-            } else {
-              marketDataForState = createDemoMarket(marketId);
-            }
-            ordersForState = await Order.filter({ market_id: marketId });
-            userOrdersForState = await Order.filter({ market_id: marketId, user_id: userId });
+        if (marketSlug) {
+          // Fetch market by slug
+          const marketData = await api.getMarket(marketSlug);
+          console.log('📊 Market: Got market data:', marketData);
+          
+          // Map backend fields to frontend format
+          const mappedMarket = {
+            ...marketData,
+            image_url: marketData.imageUrl,
+            resolution_date: marketData.closeTime,
+            current_price: marketData.yesPrice,
+            status: marketData.status.toLowerCase(),
+          };
+          
+          setMarket(mappedMarket);
+          
+          // Fetch orderbook
+          try {
+            const orderbookData = await api.getOrderbook(marketSlug);
+            console.log('📊 Market: Got orderbook:', orderbookData);
+            setOrders(orderbookData.orders || []);
+          } catch (err) {
+            console.log('📊 Market: No orderbook data');
+            setOrders([]);
+          }
+          
+          // TODO: Fetch user orders when endpoint available
+          setUserOrders([]);
         } else {
-            const defaultMarketId = "demo-weather-market";
-            marketDataForState = createDemoMarket(defaultMarketId);
-            ordersForState = await Order.filter({ market_id: defaultMarketId });
-            userOrdersForState = await Order.filter({ market_id: defaultMarketId, user_id: userId });
+          // No market specified, load first market or show error
+          const response = await api.getMarkets();
+          if (response.markets && response.markets.length > 0) {
+            const firstMarket = response.markets[0];
+            navigate(`${location.pathname}?slug=${firstMarket.slug}`, { replace: true });
+          } else {
+            console.error('No markets available');
+            setMarket(null);
+          }
         }
       } catch (error) {
-        console.error("Error loading market:", error);
-        marketDataForState = createDemoMarket(`error-market-${Date.now()}`);
-        ordersForState = [];
-        userOrdersForState = [];
+        console.error("❌ Error loading market:", error);
+        setMarket(null);
+        setOrders([]);
+        setUserOrders([]);
       }
 
-      setMarket(marketDataForState);
-      setOrders(ordersForState);
-      setUserOrders(userOrdersForState);
       setIsLoading(false);
     };
 
     fetchMarketData();
-  }, [location.search, userId]);
+  }, [location.search, userId, navigate]);
 
   const createDemoMarket = (id) => ({
     id: id,
@@ -104,18 +118,25 @@ export default function MarketPage({ user }) {
   });
 
   const handleOrderPlaced = async () => {
-    if (market && market.id) {
-      const searchParams = new URLSearchParams(location.search);
-      const originalMarketId = searchParams.get('id') || market.id;
-
-      const marketOrders = await Order.filter({ market_id: originalMarketId });
-      setOrders(marketOrders);
-
-      const userMarketOrders = await Order.filter({
-        market_id: originalMarketId,
-        user_id: userId
-      });
-      setUserOrders(userMarketOrders);
+    if (market && market.slug) {
+      console.log('📊 Market: Order placed, refreshing orderbook...');
+      try {
+        const orderbookData = await api.getOrderbook(market.slug);
+        setOrders(orderbookData.orders || []);
+        
+        // Refresh market data to get updated prices
+        const marketData = await api.getMarket(market.slug);
+        const mappedMarket = {
+          ...marketData,
+          image_url: marketData.imageUrl,
+          resolution_date: marketData.closeTime,
+          current_price: marketData.yesPrice,
+          status: marketData.status.toLowerCase(),
+        };
+        setMarket(mappedMarket);
+      } catch (error) {
+        console.error('Error refreshing after order:', error);
+      }
     }
   };
 

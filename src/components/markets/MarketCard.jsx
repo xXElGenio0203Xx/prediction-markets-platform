@@ -134,7 +134,7 @@ export default function MarketCard({ market }) {
           </div>
 
           {/* Action Button */}
-          <Link to={createPageUrl(`Market?id=${market.id}`)}>
+          <Link to={createPageUrl(`Market?slug=${market.slug}`)}>
             <Button 
               className="w-full bg-gradient-to-r from-[#A97142] to-[#CD853F] hover:from-[#8B5A3C] hover:to-[#A97142] text-white font-bold py-6 rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300"
             >

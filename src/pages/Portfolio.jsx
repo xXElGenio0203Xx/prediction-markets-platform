@@ -31,7 +31,7 @@ const MarketUpdateSubscriber = React.memo(({ marketId, onUpdate }) => {
   return null; // This component does not render anything
 });
 
-export default function PortfolioPage({ user: userFromLayout }) {
+export default function PortfolioPage({ user: userProp }) {
   const [positions, setPositions] = useState([]);
   const [markets, setMarkets] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -78,14 +78,35 @@ export default function PortfolioPage({ user: userFromLayout }) {
   };
 
   useEffect(() => {
-    if (userFromLayout) {
-      setUser(userFromLayout);
-      loadPortfolioData();
-    } else {
-      setUser(null);
-      setIsLoading(false);
-    }
-  }, [userFromLayout]);
+    const initPortfolio = async () => {
+      const token = localStorage.getItem('accessToken');
+      console.log('📊 Portfolio: Token exists:', !!token);
+      console.log('📊 Portfolio: User prop received:', userProp);
+      
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      // If we have userProp, use it, otherwise fetch current user
+      if (userProp) {
+        setUser(userProp);
+        await loadPortfolioData();
+      } else {
+        try {
+          const currentUser = await api.getCurrentUser();
+          console.log('📊 Portfolio: Fetched current user:', currentUser);
+          setUser(currentUser);
+          await loadPortfolioData();
+        } catch (error) {
+          console.error('Failed to fetch current user:', error);
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    initPortfolio();
+  }, [userProp]);
 
   // Callback for handling real-time market updates
   const handlePortfolioUpdate = (update) => {

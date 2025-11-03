@@ -1,13 +1,18 @@
 /**
  * API Client for Prediction Markets Backend
  * Connects to Fastify backend with JWT authentication
+ * Version: 2.0 (with /api prefix fix)
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+
+console.log('📦 API Base URL configured as:', API_BASE_URL);
+console.log('📦 VITE_API_URL env var:', import.meta.env.VITE_API_URL);
 
 class APIClient {
   constructor() {
     this.baseUrl = API_BASE_URL;
+    console.log('🔧 APIClient initialized with baseUrl:', this.baseUrl);
   }
 
   /**
@@ -15,11 +20,16 @@ class APIClient {
    */
   async request(endpoint, options = {}) {
     const url = `${this.baseUrl}${endpoint}`;
+    console.log('🌐 API Request:', url);
+    
+    // Get access token from localStorage
+    const accessToken = localStorage.getItem('accessToken');
     
     const config = {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
         ...options.headers,
       },
       credentials: 'include', // Include HTTP-only cookies
@@ -77,7 +87,7 @@ class APIClient {
   async register(email, password, displayName) {
     return this.request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, displayName }),
+      body: JSON.stringify({ email, password, fullName: displayName }),
     });
   }
 
@@ -89,9 +99,12 @@ class APIClient {
   }
 
   async logout() {
-    return this.request('/auth/logout', {
+    const result = await this.request('/auth/logout', {
       method: 'POST',
     });
+    // Clear access token from localStorage
+    localStorage.removeItem('accessToken');
+    return result;
   }
 
   async getCurrentUser() {

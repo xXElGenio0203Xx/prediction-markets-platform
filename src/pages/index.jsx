@@ -24,6 +24,8 @@ import TradeHistory from "./TradeHistory";
 
 import PlatformMetrics from "./PlatformMetrics";
 
+import Login from "./Login";
+
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
@@ -52,6 +54,8 @@ const PAGES = {
     
     PlatformMetrics: PlatformMetrics,
     
+    Login: Login,
+    
 }
 
 function _getCurrentPage(url) {
@@ -71,6 +75,15 @@ function _getCurrentPage(url) {
 function PagesContent() {
     const location = useLocation();
     const currentPage = _getCurrentPage(location.pathname);
+    
+    // Login page doesn't need the Layout wrapper
+    if (location.pathname.toLowerCase() === '/login') {
+        return (
+            <Routes>
+                <Route path="/Login" element={<Login />} />
+            </Routes>
+        );
+    }
     
     return (
         <Layout currentPageName={currentPage}>

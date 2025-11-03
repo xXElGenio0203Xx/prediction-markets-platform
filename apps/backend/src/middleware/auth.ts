@@ -16,13 +16,13 @@ export function generateTokens(userId: string, email: string, role: string) {
   const accessToken = jwt.sign(
     { sub: userId, email, role, type: 'access' },
     config.JWT_SECRET,
-    { expiresIn: config.JWT_ACCESS_EXPIRY } as jwt.SignOptions
+    { expiresIn: config.JWT_EXPIRES_IN } as jwt.SignOptions
   );
 
   const refreshToken = jwt.sign(
     { sub: userId, type: 'refresh' },
     config.JWT_REFRESH_SECRET || config.JWT_SECRET,
-    { expiresIn: config.JWT_REFRESH_EXPIRY } as jwt.SignOptions
+    { expiresIn: config.JWT_REFRESH_EXPIRES_IN } as jwt.SignOptions
   );
 
   return { accessToken, refreshToken };

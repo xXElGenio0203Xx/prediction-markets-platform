@@ -15,6 +15,7 @@ import {
 import MoneyFall from "../components/animations/MoneyFall";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/api/client";
+import { ensureUserBonus } from "@/api/functions";
 
 const navigationItems = [
   { title: "Markets", url: createPageUrl("Markets"), icon: TrendingUp },
@@ -38,10 +39,24 @@ export default function Layout({ children, currentPageName }) {
   useEffect(() => {
     const fetchUser = async () => {
       setIsLoadingUser(true);
+      
+      // Check if we have an access token
+      const token = localStorage.getItem('accessToken');
+      console.log('🔑 Access token present:', !!token);
+      
+      if (!token) {
+        console.log('❌ No access token found, user not authenticated');
+        setUser(null);
+        setBrunoDollars(0);
+        setActivePositions(0);
+        setIsLoadingUser(false);
+        return;
+      }
+      
       try {
         console.log('🔍 Attempting to fetch current user...');
-        const currentUser = await User.me();
-        console.log('✅ User authenticated:', currentUser.email);
+        const currentUser = await api.getCurrentUser();
+        console.log('✅ User authenticated:', currentUser);
         
         // Ensure user has their $100 bonus and is properly initialized
         try {
@@ -59,37 +74,30 @@ export default function Layout({ children, currentPageName }) {
         try {
           console.log('📊 Fetching FRESH user data after bonus...');
           
-          const users = await User.list();
-          // Use .toLowerCase() for robust email comparison
-          const updatedUser = users.find(u => u.email.toLowerCase() === currentUser.email.toLowerCase());
+          // Get updated user data directly
+          const updatedUser = await api.getCurrentUser();
           
-          if (updatedUser) {
-            console.log('✅ Found updated user:', {
-              email: updatedUser.email,
-              bruno_dollars: updatedUser.bruno_dollars,
-              role: updatedUser.role,
-              is_verified: updatedUser.is_verified,
-              can_trade: updatedUser.can_trade
-            });
-            setUser(updatedUser);
-            setBrunoDollars(updatedUser.bruno_dollars || 100);
-          } else {
-            console.warn('⚠️ User not found in list, using current user data');
-            setUser(currentUser);
-            setBrunoDollars(100); // Default to 100 if user not found in list
-          }
+          console.log('✅ Found updated user:', {
+            email: updatedUser.email,
+            role: updatedUser.role,
+          });
+          setUser(updatedUser);
           
-          // Fetch positions - ensure user_id comparison is consistent
-          const positions = await Position.filter({ user_id: currentUser.email.toLowerCase() });
+          // Get balance
+          const balance = await api.getBalance();
+          setBrunoDollars(balance.available || 0);
+          
+          // Fetch positions
+          const positions = await api.getPositions();
           const activeCount = positions.filter(p => p.shares > 0).length;
           setActivePositions(activeCount);
           console.log(`📈 Loaded ${activeCount} active positions`);
           
         } catch (dataError) {
           console.error('❌ Error fetching user data:', dataError);
-          // Fallback to current user data if fetching from list fails
+          // Fallback to current user data if fetching fails
           setUser(currentUser);
-          setBrunoDollars(100); // Default to 100
+          setBrunoDollars(0);
         }
         
       } catch (error) {
@@ -110,23 +118,22 @@ export default function Layout({ children, currentPageName }) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [location.pathname]);
 
-  const handleLogin = async () => {
-    console.log('🔐 Initiating login...');
-    try {
-      await User.loginWithRedirect(window.location.href);
-    } catch (error) {
-      console.error('❌ Login error:', error);
-      alert('Failed to initiate login. Please try again.');
-    }
+  const handleLogin = () => {
+    console.log('🔐 Redirecting to login page...');
+    // Redirect to a login page or show a login modal
+    // For now, redirect to a login route
+    window.location.href = createPageUrl("Login");
   };
 
   const handleLogout = async () => {
     console.log('👋 Logging out...');
     try {
-      await User.logout();
+      await api.logout();
       setUser(null);
       setBrunoDollars(0);
       setActivePositions(0);
+      // Redirect to home page after logout
+      window.location.href = createPageUrl("Markets");
     } catch (error) {
       console.error('❌ Logout error:', error);
     }
@@ -213,9 +220,9 @@ export default function Layout({ children, currentPageName }) {
                     variant="ghost" 
                     size="sm" 
                     onClick={handleLogout} 
-                    className="text-white/60 hover:text-white hover:bg-white/10 p-1"
+                    className="text-white/80 hover:text-white hover:bg-white/20 px-2 py-1 text-xs"
                   >
-                    <X className="w-3 h-3" />
+                    Logout
                   </Button>
                 </div>
               ) : (

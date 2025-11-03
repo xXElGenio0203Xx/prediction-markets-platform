@@ -17,9 +17,20 @@ export default function TradeHistory() {
     offset: 0,
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['trade-history', filters],
-    queryFn: () => api.getTradeHistory(filters),
+    queryFn: async () => {
+      console.log('📊 TradeHistory: Fetching trades...');
+      try {
+        const result = await api.getTradeHistory(filters);
+        console.log('📊 TradeHistory: Got data:', result);
+        return result;
+      } catch (err) {
+        console.error('❌ TradeHistory: Error:', err);
+        throw err;
+      }
+    },
+    retry: false,
   });
 
   const handleExport = async () => {
@@ -44,7 +55,22 @@ export default function TradeHistory() {
   };
 
   if (isLoading) {
-    return <div className="container mx-auto py-8">Loading...</div>;
+    return (
+      <div className="container mx-auto py-8">
+        <div className="text-center">Loading trade history...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="text-center text-red-500">
+          <p>Error loading trade history: {error.message}</p>
+          <p className="text-sm mt-2">Please make sure you're logged in.</p>
+        </div>
+      </div>
+    );
   }
 
   const { trades = [], pagination, summary } = data || {};

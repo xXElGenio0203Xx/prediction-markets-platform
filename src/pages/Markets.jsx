@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { api } from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -55,44 +56,32 @@ export default function MarketsPage() {
   const loadMarkets = async () => {
     setIsLoading(true);
     try {
-      const data = await Market.list("-created_date");
+      console.log('📊 Markets: Loading markets...');
+      const response = await api.getMarkets();
+      console.log('📊 Markets: API response:', response);
+      const data = response.markets || [];
+      console.log('📊 Markets: Data length:', data.length);
       
-      const targetFeatured = [
-        {
-          titleSubstr: "Will it snow at Brown this week?",
-          imageUrl: "https://images.unsplash.com/photo-1542601098-8fc114e148e2?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-          overridePrice: null
-        },
-        {
-          titleSubstr: "Will the median score of principles of ECON midterm I be above 65?",
-          imageUrl: "/market-default.svg",
-          overridePrice: null
-        },
-        {
-          titleSubstr: "Will another Bajas open this year?",
-          imageUrl: "/market-default.svg",
-          overridePrice: 0.02
-        },
-      ];
-
-      const featured = targetFeatured
-        .map(target => {
-          const market = data.find(m => m.title.includes(target.titleSubstr));
-          if (market) {
-            const updatedMarket = { ...market, image_url: target.imageUrl };
-            if (target.overridePrice !== null) {
-              updatedMarket.current_price = target.overridePrice;
-            }
-            return updatedMarket;
-          }
-          return null;
-        })
-        .filter(Boolean);
-
+      // Map backend data to frontend format
+      const mappedData = data.map(market => ({
+        ...market,
+        image_url: market.imageUrl,
+        resolution_date: market.closeTime,
+        current_price: market.yesPrice,
+        status: market.status.toLowerCase(),
+      }));
+      
+      // Use featured markets from backend
+      const featured = mappedData.filter(m => m.featured);
+      console.log('📊 Markets: Featured count:', featured.length);
+      console.log('📊 Markets: Total markets:', mappedData.length);
+      
       setFeaturedMarkets(featured);
-      setMarkets(data);
+      setMarkets(mappedData);
     } catch (error) {
-      console.error("Error loading markets:", error);
+      console.error("❌ Error loading markets:", error);
+      setMarkets([]);
+      setFeaturedMarkets([]);
     }
     setIsLoading(false);
   };
@@ -113,17 +102,17 @@ export default function MarketsPage() {
           backgroundImage: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
           backgroundAttachment: 'fixed'
         }}
-        initial={{ scale: 1.1 }}
+        initial={{ scale: 1.05 }}
         animate={{ scale: 1 }}
-        transition={{ duration: 1.5 }}
+        transition={{ duration: 0.5 }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-[#4E3629]/90" />
         
         <div className="relative max-w-7xl mx-auto h-full flex flex-col justify-center items-center text-center px-4 sm:px-6 lg:px-8 text-white z-10">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.8 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
           >
             <Badge className="bg-[#A97142] text-white mb-6 text-sm font-medium px-4 py-2">
               <Sparkles className="w-4 h-4 mr-2" />
@@ -134,9 +123,9 @@ export default function MarketsPage() {
           <motion.h1 
             className="text-5xl sm:text-6xl lg:text-8xl font-black mb-6 leading-tight"
             style={{ textShadow: '3px 3px 8px rgba(0,0,0,0.8)' }}
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.8 }}
+            transition={{ delay: 0.2, duration: 0.4 }}
           >
             The Bruno Exchange
           </motion.h1>
@@ -145,7 +134,7 @@ export default function MarketsPage() {
             className="space-y-3 mb-10"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.6, duration: 1 }}
+            transition={{ delay: 0.3, duration: 0.4 }}
           >
             <p className="text-2xl sm:text-3xl lg:text-4xl text-[#FAF3E0] font-semibold" style={{ textShadow: '2px 2px 6px rgba(0,0,0,0.7)' }}>
               Trade on campus events.
@@ -159,7 +148,7 @@ export default function MarketsPage() {
             className="flex flex-col sm:flex-row gap-4 mb-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8, duration: 0.8 }}
+            transition={{ delay: 0.4, duration: 0.4 }}
           >
             <a href="#markets-grid" className="scroll-smooth">
               <Button

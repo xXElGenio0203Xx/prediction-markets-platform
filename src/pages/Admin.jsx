@@ -57,7 +57,8 @@ export default function AdminPage({ user }) {
   // feesSummary state is removed as FeesTile will manage its own data
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') {
+    if (!user || user.role !== 'ADMIN') {
+      console.log('⚠️ Admin: User is not admin, role:', user?.role);
       return;
     }
     loadMarkets();
@@ -76,8 +77,19 @@ export default function AdminPage({ user }) {
   const loadMarkets = async () => {
     setIsLoading(true);
     try {
-      const data = await Market.list("-created_date");
-      setMarkets(data);
+      console.log('📊 Admin: Loading markets...');
+      const response = await api.getMarkets();
+      const data = response.markets || [];
+      console.log('📊 Admin: Got markets:', data.length);
+      
+      // Map backend fields
+      const mappedData = data.map(m => ({
+        ...m,
+        status: m.status.toLowerCase(),
+        resolution_date: m.closeTime,
+      }));
+      
+      setMarkets(mappedData);
     } catch (error) {
       console.error("Error loading markets:", error);
     }

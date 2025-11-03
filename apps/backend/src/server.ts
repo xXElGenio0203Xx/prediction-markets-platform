@@ -147,12 +147,14 @@ const registerRoutes = async () => {
   const ordersRoutes = await import('./routes/orders.js');
   const userRoutes = await import('./routes/user.js');
   const adminRoutes = await import('./routes/admin.js');
+  const analyticsRoutes = await import('./routes/analytics.js');
 
   await app.register(authRoutes.default, { prefix: '/api/auth' });
   await app.register(marketsRoutes.default, { prefix: '/api/markets' });
   await app.register(ordersRoutes.default, { prefix: '/api/orders' });
   await app.register(userRoutes.default, { prefix: '/api/user' });
   await app.register(adminRoutes.default, { prefix: '/api/admin' });
+  await app.register(analyticsRoutes.default, { prefix: '/api/analytics' });
 };
 
 await registerRoutes();
@@ -161,7 +163,7 @@ await registerRoutes();
 // Socket.IO Server
 // ============================================================================
 
-const httpServer = createServer(app.server);
+const httpServer = app.server;
 
 const io = new SocketIOServer(httpServer, {
   cors: {

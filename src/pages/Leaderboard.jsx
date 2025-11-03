@@ -34,13 +34,20 @@ export default function LeaderboardPage() {
 
   const loadLeaderboard = async () => {
     try {
-      const data = await getLeaderboard({});
-      if (data.success) {
+      console.log('📊 Leaderboard: Loading...');
+      const data = await api.getLeaderboard(50);
+      console.log('📊 Leaderboard: Got data:', data);
+      if (data && data.leaderboard) {
         setLeaderboard(data.leaderboard);
+        setLastUpdate(new Date());
+      } else if (Array.isArray(data)) {
+        // In case backend returns array directly
+        setLeaderboard(data);
         setLastUpdate(new Date());
       }
     } catch (error) {
-      console.error("Error loading leaderboard:", error);
+      console.error("❌ Error loading leaderboard:", error);
+      setLeaderboard([]);
     }
     setIsLoading(false);
   };
