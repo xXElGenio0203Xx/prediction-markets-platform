@@ -101,6 +101,7 @@ class APIClient {
   async logout() {
     const result = await this.request('/auth/logout', {
       method: 'POST',
+      body: JSON.stringify({}),
     });
     // Clear access token from localStorage
     localStorage.removeItem('accessToken');
