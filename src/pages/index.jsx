@@ -16,6 +16,8 @@ import AllMarkets from "./AllMarkets";
 
 import Admin from "./Admin";
 
+import MarketRequests from "./MarketRequests";
+
 import PortfolioAnalytics from "./PortfolioAnalytics";
 
 import MarketAnalytics from "./MarketAnalytics";
@@ -45,6 +47,8 @@ const PAGES = {
     AllMarkets: AllMarkets,
     
     Admin: Admin,
+    
+    MarketRequests: MarketRequests,
     
     PortfolioAnalytics: PortfolioAnalytics,
     
@@ -107,6 +111,8 @@ function PagesContent() {
                 <Route path="/AllMarkets" element={<AllMarkets />} />
                 
                 <Route path="/Admin" element={<Admin />} />
+                
+                <Route path="/MarketRequests" element={<MarketRequests />} />
                 
                 <Route path="/PortfolioAnalytics" element={<PortfolioAnalytics />} />
                 

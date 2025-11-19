@@ -29,11 +29,12 @@ import FeaturedMarkets from "../components/markets/FeaturedMarkets";
 
 const categories = [
   { name: 'All', value: 'all', icon: LayoutGrid },
-  { name: 'Academics', value: 'academics', icon: BookOpen },
-  { name: 'Weather', value: 'weather', icon: Cloud },
-  { name: 'Politics', value: 'campus_politics', icon: Users },
-  { name: 'Commencement', value: 'commencement', icon: Mic },
-  { name: 'Seasonal', value: 'seasonal', icon: CalendarIcon }
+  { name: 'Crypto', value: 'CRYPTO', icon: TrendingUp },
+  { name: 'Tech', value: 'TECH', icon: BookOpen },
+  { name: 'Economics', value: 'ECONOMICS', icon: BarChart3 },
+  { name: 'Science', value: 'SCIENCE', icon: Cloud },
+  { name: 'Politics', value: 'POLITICS', icon: Users },
+  { name: 'Sports', value: 'SPORTS', icon: Trophy },
 ];
 
 export default function MarketsPage() {
@@ -90,8 +91,8 @@ export default function MarketsPage() {
     markets :
     markets.filter((market) => market.category === activeCategory);
 
-  const activeMarkets = markets.filter((m) => m.status === "active");
-  const totalVolume = activeMarkets.reduce((sum, m) => sum + (m.volume || 0), 0);
+  const activeMarkets = markets.filter((m) => m.status === "open" || m.status === "OPEN");
+  const totalVolume = activeMarkets.reduce((sum, m) => sum + (m.volume24h || m.volume || 0), 0);
 
   return (
     <div className="min-h-screen">

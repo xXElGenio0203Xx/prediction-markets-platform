@@ -265,8 +265,13 @@ class APIClient {
    * Export trades to CSV
    */
   async exportTrades() {
-    const response = await fetch(`${this.baseURL}/analytics/trades/export`, {
-      headers: this.getHeaders(),
+    const accessToken = localStorage.getItem('accessToken');
+    
+    const response = await fetch(`${this.baseUrl}/analytics/trades/export`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      credentials: 'include',
     });
 
     if (!response.ok) {
@@ -290,6 +295,70 @@ class APIClient {
    */
   async getPlatformMetrics(period = '30d') {
     return this.request(`/analytics/admin/platform?period=${period}`);
+  }
+
+  // ============================================
+  // MARKET REQUESTS METHODS
+  // ============================================
+
+  /**
+   * Submit a market request
+   * @param {Object} requestData - Market request data
+   */
+  async submitMarketRequest(requestData) {
+    return this.request('/market-requests', {
+      method: 'POST',
+      body: JSON.stringify(requestData),
+    });
+  }
+
+  /**
+   * Get all market requests (admin only)
+   * @param {Object} filters - Filter options
+   */
+  async getAllMarketRequests(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.page) params.append('page', filters.page.toString());
+    if (filters.pageSize) params.append('pageSize', filters.pageSize.toString());
+
+    const query = params.toString();
+    return this.request(`/market-requests/admin/all${query ? '?' + query : ''}`);
+  }
+
+  /**
+   * Get single market request details (admin only)
+   * @param {string} id - Request ID
+   */
+  async getMarketRequest(id) {
+    return this.request(`/market-requests/admin/${id}`);
+  }
+
+  /**
+   * Review a market request (admin only)
+   * @param {string} id - Request ID
+   * @param {string} status - 'APPROVED' or 'REJECTED'
+   * @param {string} adminNotes - Optional admin notes
+   */
+  async reviewMarketRequest(id, status, adminNotes) {
+    return this.request(`/market-requests/admin/${id}/review`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, adminNotes }),
+    });
+  }
+
+  /**
+   * Get user's own market requests
+   */
+  async getMyMarketRequests() {
+    return this.request('/market-requests/my-requests');
+  }
+
+  /**
+   * Get market request statistics (admin only)
+   */
+  async getMarketRequestStats() {
+    return this.request('/market-requests/admin/stats');
   }
 }
 

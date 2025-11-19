@@ -6,7 +6,17 @@ import { api } from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Info, TrendingUp, Star, Trophy, Clock, Users, DollarSign } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ArrowLeft, Info, TrendingUp, Star, Trophy, Clock, Users, DollarSign, CheckCircle, XCircle, Shield } from "lucide-react";
 import { createPageUrl } from "@/utils";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
@@ -29,9 +39,10 @@ const mockPriceHistory = [
   { date: "Jan 06", price: 0.73 },
 ];
 
-export default function MarketPage({ user }) {
+export default function MarketPage({ user: userProp }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [user, setUser] = useState(userProp);
   const [market, setMarket] = useState(null);
   const [orders, setOrders] = useState([]);
   const [userOrders, setUserOrders] = useState([]);
@@ -39,8 +50,29 @@ export default function MarketPage({ user }) {
   const [selectedOutcome, setSelectedOutcome] = useState('yes');
   const [isWatchlisted, setIsWatchlisted] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
+  
+  // Resolution dialog state
+  const [showResolutionDialog, setShowResolutionDialog] = useState(false);
+  const [resolutionOutcome, setResolutionOutcome] = useState(null);
+  const [resolutionReason, setResolutionReason] = useState('');
+  const [isResolving, setIsResolving] = useState(false);
 
   const userId = user ? user.email : 'anonymous-user';
+
+  // Fetch current user if not provided
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      if (!userProp) {
+        try {
+          const currentUser = await api.getCurrentUser();
+          setUser(currentUser);
+        } catch (error) {
+          console.log('No user authenticated');
+        }
+      }
+    };
+    fetchCurrentUser();
+  }, [userProp]);
 
   useEffect(() => {
     const fetchMarketData = async () => {
@@ -169,6 +201,46 @@ export default function MarketPage({ user }) {
   // Subscribe to updates
   useMarketUpdates(market?.id, handleMarketUpdate);
 
+  // Resolution handlers
+  const handleOpenResolutionDialog = (outcome) => {
+    setResolutionOutcome(outcome);
+    setResolutionReason('');
+    setShowResolutionDialog(true);
+  };
+
+  const handleConfirmResolution = async () => {
+    if (!resolutionReason.trim()) {
+      alert('Please provide a resolution reason');
+      return;
+    }
+
+    setIsResolving(true);
+    try {
+      const outcome = resolutionOutcome ? 'YES' : 'NO';
+      await api.resolveMarket(market.slug, outcome, resolutionReason);
+      
+      alert(`✅ Market resolved successfully!\n\nOutcome: ${outcome}\nReason: ${resolutionReason}`);
+      
+      // Reload market data
+      const marketData = await api.getMarket(market.slug);
+      const mappedMarket = {
+        ...marketData,
+        image_url: marketData.imageUrl,
+        resolution_date: marketData.closeTime,
+        current_price: marketData.yesPrice,
+        status: marketData.status.toLowerCase(),
+        outcome: marketData.outcome,
+        resolutionSource: marketData.resolutionSource,
+      };
+      setMarket(mappedMarket);
+      setShowResolutionDialog(false);
+    } catch (error) {
+      console.error('Error resolving market:', error);
+      alert(`❌ Failed to resolve market: ${error.message}`);
+    }
+    setIsResolving(false);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#FAF3E0] to-[#E8DCC8]">
@@ -250,6 +322,27 @@ export default function MarketPage({ user }) {
 
             {/* Actions */}
             <div className="flex items-center gap-2">
+              {/* Admin Resolution Buttons - Only show for ADMIN on OPEN markets */}
+              {user?.role === 'ADMIN' && market.status === 'open' && (
+                <>
+                  <Button
+                    onClick={() => handleOpenResolutionDialog(true)}
+                    className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Resolve YES
+                  </Button>
+                  <Button
+                    onClick={() => handleOpenResolutionDialog(false)}
+                    className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-2"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    Resolve NO
+                  </Button>
+                </>
+              )}
+              
+              {/* Regular user actions */}
               <Button
                 variant="outline"
                 size="icon"
@@ -269,6 +362,33 @@ export default function MarketPage({ user }) {
             </div>
           </div>
         </div>
+
+        {/* Market Status Banner - Show if resolved */}
+        {market.status === 'resolved' && market.outcome && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`mb-6 p-4 rounded-xl border-2 ${
+              market.outcome === 'YES' 
+                ? 'bg-green-50 border-green-500' 
+                : 'bg-red-50 border-red-500'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Shield className={`w-6 h-6 ${market.outcome === 'YES' ? 'text-green-600' : 'text-red-600'}`} />
+              <div className="flex-1">
+                <h3 className={`font-bold text-lg ${market.outcome === 'YES' ? 'text-green-900' : 'text-red-900'}`}>
+                  Market Resolved: {market.outcome}
+                </h3>
+                {market.resolutionSource && (
+                  <p className={`text-sm mt-1 ${market.outcome === 'YES' ? 'text-green-700' : 'text-red-700'}`}>
+                    <strong>Resolution Reason:</strong> {market.resolutionSource}
+                  </p>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Main Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -323,6 +443,85 @@ export default function MarketPage({ user }) {
           </motion.div>
         </div>
       )}
+
+      {/* Resolution Dialog */}
+      <Dialog open={showResolutionDialog} onOpenChange={setShowResolutionDialog}>
+        <DialogContent className="bg-white border-2 border-[#A97142]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-[#4E3629] flex items-center gap-2">
+              <Shield className={`w-6 h-6 ${resolutionOutcome ? 'text-green-600' : 'text-red-600'}`} />
+              Resolve Market: {resolutionOutcome ? 'YES' : 'NO'}
+            </DialogTitle>
+            <DialogDescription className="text-[#4E3629]/70">
+              This action will finalize the market outcome and distribute winnings to holders of {resolutionOutcome ? 'YES' : 'NO'} shares.
+              All losing shares will become worthless.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-semibold text-[#4E3629] mb-2 block">
+                Market Question
+              </label>
+              <p className="text-[#4E3629]/80 text-sm bg-[#FAF3E0] p-3 rounded-lg">
+                {market?.title || market?.question}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-[#4E3629] mb-2 block">
+                Resolution Reason *
+              </label>
+              <Textarea
+                placeholder="Explain why this market is being resolved to this outcome (e.g., 'It did not snow in Providence on this date according to NOAA weather data')"
+                value={resolutionReason}
+                onChange={(e) => setResolutionReason(e.target.value)}
+                className="min-h-[120px] border-[#A97142] focus:border-[#8B5A3C]"
+              />
+              <p className="text-xs text-[#4E3629]/60 mt-1">
+                This reason will be permanently displayed on the market page.
+              </p>
+            </div>
+
+            <div className={`p-4 rounded-lg border-2 ${resolutionOutcome ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-500'}`}>
+              <h4 className={`font-bold mb-2 ${resolutionOutcome ? 'text-green-900' : 'text-red-900'}`}>
+                ⚠️ Warning: This action is irreversible
+              </h4>
+              <ul className={`text-sm space-y-1 ${resolutionOutcome ? 'text-green-700' : 'text-red-700'}`}>
+                <li>✓ {resolutionOutcome ? 'YES' : 'NO'} share holders will receive $1 per share</li>
+                <li>✗ {resolutionOutcome ? 'NO' : 'YES'} share holders will lose their investment</li>
+                <li>↩ Open orders will be cancelled and refunded</li>
+                <li>🔒 The market will be permanently closed to trading</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowResolutionDialog(false)}
+              disabled={isResolving}
+              className="border-[#A97142] text-[#4E3629]"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmResolution}
+              disabled={isResolving || !resolutionReason.trim()}
+              className={`${resolutionOutcome ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} text-white`}
+            >
+              {isResolving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Resolving...
+                </>
+              ) : (
+                `Confirm Resolution: ${resolutionOutcome ? 'YES' : 'NO'}`
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

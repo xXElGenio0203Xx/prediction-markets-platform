@@ -16,13 +16,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { api } from "@/api/client";
 
 export default function TradeWidget({ market, user, onOrderPlaced, selectedOutcome, onOutcomeChange }) {
   const [probability, setProbability] = useState(50); // Represents price as a percentage
   const [quantity, setQuantity] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastOrderStatus, setLastOrderStatus] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(user);
   const [userPositions, setUserPositions] = useState([]);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, side: null });
   const [feeCfg, setFeeCfg] = useState({ maker_bps: 0, taker_bps: 0, per_contract_fee: 0 }); // ADDED: fee config state
@@ -31,7 +32,7 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const me = await User.me();
+        const me = await api.getCurrentUser();
         setCurrentUser(me);
         console.log('✅ Loaded current user:', me.email);
       } catch (error) {
@@ -39,26 +40,28 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
         setCurrentUser(null);
       }
     };
-    loadUser();
-  }, [onOrderPlaced]); // Re-fetch user after an order is placed
+    if (!user) {
+      loadUser();
+    }
+  }, [user, onOrderPlaced]); // Re-fetch user after an order is placed
 
   // Load user positions for this market
   useEffect(() => {
     const loadPositions = async () => {
       if (!currentUser || !market?.id) return;
       try {
-        const positions = await Position.filter({
-          user_id: currentUser.email,
-          market_id: market.id
-        });
-        setUserPositions(positions);
+        const response = await api.getPositions();
+        const allPositions = response.positions || [];
+        // Filter positions for this market
+        const marketPositions = allPositions.filter(p => p.marketId === market.id);
+        setUserPositions(marketPositions);
       } catch (error) {
         console.error('Error loading positions:', error);
         setUserPositions([]);
       }
     };
     loadPositions();
-  }, [currentUser, market.id, lastOrderStatus]); // Reload positions when user changes, market changes, or an order status updates
+  }, [currentUser, market?.id, lastOrderStatus]); // Reload positions when user changes, market changes, or an order status updates
 
   // TODO: Implement fee configuration endpoint
   // For now, fees are disabled (set to 0)
@@ -88,7 +91,7 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
   })();
 
   // Check if user can trade
-  const canTrade = currentUser && currentUser.email && currentUser.email.toLowerCase().endsWith('@brown.edu');
+  const canTrade = currentUser && currentUser.email && currentUser.email.toLowerCase().endsWith('@brown.edu') && market?.status !== 'resolved';
   const userCash = currentUser?.bruno_dollars || 0;
   // UPDATED: hasEnoughCash now considers estimated fees
   const hasEnoughCash = userCash >= (parseFloat(cost) + estimatedFee);

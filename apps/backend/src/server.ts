@@ -148,6 +148,7 @@ const registerRoutes = async () => {
   const userRoutes = await import('./routes/user.js');
   const adminRoutes = await import('./routes/admin.js');
   const analyticsRoutes = await import('./routes/analytics.js');
+  const marketRequestsRoutes = await import('./routes/marketRequests.js');
 
   await app.register(authRoutes.default, { prefix: '/api/auth' });
   await app.register(marketsRoutes.default, { prefix: '/api/markets' });
@@ -155,6 +156,7 @@ const registerRoutes = async () => {
   await app.register(userRoutes.default, { prefix: '/api/user' });
   await app.register(adminRoutes.default, { prefix: '/api/admin' });
   await app.register(analyticsRoutes.default, { prefix: '/api/analytics' });
+  await app.register(marketRequestsRoutes.default, { prefix: '/api/market-requests' });
 };
 
 await registerRoutes();

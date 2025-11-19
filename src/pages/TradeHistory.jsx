@@ -9,8 +9,8 @@ import { Download, Filter, TrendingUp, TrendingDown } from 'lucide-react';
 
 export default function TradeHistory() {
   const [filters, setFilters] = useState({
-    outcome: '',
-    side: '',
+    outcome: 'all',
+    side: 'all',
     start: '',
     end: '',
     limit: 50,
@@ -22,7 +22,13 @@ export default function TradeHistory() {
     queryFn: async () => {
       console.log('📊 TradeHistory: Fetching trades...');
       try {
-        const result = await api.getTradeHistory(filters);
+        // Convert 'all' back to empty string for API
+        const apiFilters = {
+          ...filters,
+          outcome: filters.outcome === 'all' ? '' : filters.outcome,
+          side: filters.side === 'all' ? '' : filters.side,
+        };
+        const result = await api.getTradeHistory(apiFilters);
         console.log('📊 TradeHistory: Got data:', result);
         return result;
       } catch (err) {
@@ -147,28 +153,28 @@ export default function TradeHistory() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Select
-              value={filters.outcome}
-              onValueChange={(value) => handleFilterChange('outcome', value)}
+              value={filters.outcome || 'all'}
+              onValueChange={(value) => handleFilterChange('outcome', value === 'all' ? '' : value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Outcome" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Outcomes</SelectItem>
+                <SelectItem value="all">All Outcomes</SelectItem>
                 <SelectItem value="YES">YES</SelectItem>
                 <SelectItem value="NO">NO</SelectItem>
               </SelectContent>
             </Select>
 
             <Select
-              value={filters.side}
-              onValueChange={(value) => handleFilterChange('side', value)}
+              value={filters.side || 'all'}
+              onValueChange={(value) => handleFilterChange('side', value === 'all' ? '' : value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Side" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Sides</SelectItem>
+                <SelectItem value="all">All Sides</SelectItem>
                 <SelectItem value="BUY">BUY</SelectItem>
                 <SelectItem value="SELL">SELL</SelectItem>
               </SelectContent>
@@ -191,8 +197,8 @@ export default function TradeHistory() {
             <Button
               variant="outline"
               onClick={() => setFilters({
-                outcome: '',
-                side: '',
+                outcome: 'all',
+                side: 'all',
                 start: '',
                 end: '',
                 limit: 50,

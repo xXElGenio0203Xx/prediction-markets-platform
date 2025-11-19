@@ -88,8 +88,9 @@ export default function Layout({ children, currentPageName }) {
           setBrunoDollars(balance.available || 0);
           
           // Fetch positions
-          const positions = await api.getPositions();
-          const activeCount = positions.filter(p => p.shares > 0).length;
+          const positionsData = await api.getPositions();
+          const positionsArray = positionsData.positions || [];
+          const activeCount = positionsArray.filter(p => p.shares > 0).length;
           setActivePositions(activeCount);
           console.log(`📈 Loaded ${activeCount} active positions`);
           
@@ -315,9 +316,9 @@ export default function Layout({ children, currentPageName }) {
         {React.cloneElement(children, { user })}
 
         {/* Discreet Admin Button on Learn More page for Admins */}
-        {user?.role === 'admin' && isLearnMorePage && (
+        {user?.role === 'ADMIN' && isLearnMorePage && (
           <motion.div 
-            className="fixed bottom-8 right-8 z-20"
+            className="fixed bottom-8 right-8 z-20 space-y-2"
             initial={{ opacity: 0, scale: 0 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 2, duration: 0.5 }}
@@ -326,9 +327,18 @@ export default function Layout({ children, currentPageName }) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="bg-[#4E3629]/10 hover:bg-[#4E3629]/20 text-[#4E3629] text-xs backdrop-blur-sm"
+                className="bg-[#4E3629]/10 hover:bg-[#4E3629]/20 text-[#4E3629] text-xs backdrop-blur-sm w-full"
               >
-                Admin
+                Admin Panel
+              </Button>
+            </Link>
+            <Link to={createPageUrl("MarketRequests")}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="bg-[#4E3629]/10 hover:bg-[#4E3629]/20 text-[#4E3629] text-xs backdrop-blur-sm w-full"
+              >
+                Market Requests
               </Button>
             </Link>
           </motion.div>

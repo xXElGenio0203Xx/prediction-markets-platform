@@ -234,7 +234,7 @@ export default function PortfolioPage({ user: userProp }) {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-2 border-[#A97142] text-[#FAF3E0] hover:bg-[#A97142]/20"
+                className="border-2 border-[#A97142] text-[#4E3629] font-semibold hover:bg-[#A97142]/20"
               >
                 <Trophy className="w-4 h-4 mr-2" />
                 Leaderboard
@@ -452,19 +452,19 @@ export default function PortfolioPage({ user: userProp }) {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Link to={createPageUrl("Markets")}>
-                  <Button variant="outline" className="w-full justify-start border-[#A97142] text-[#FAF3E0] hover:bg-[#A97142]/20">
+                  <Button variant="outline" className="w-full justify-start border-[#A97142] text-[#8B4513] font-semibold hover:bg-[#A97142]/20 hover:text-[#5C2E0D]">
                     <ArrowUpRight className="w-4 h-4 mr-2" />
                     Browse Markets
                   </Button>
                 </Link>
                 <Link to={createPageUrl("RequestMarket")}>
-                  <Button variant="outline" className="w-full justify-start border-[#A97142] text-[#FAF3E0] hover:bg-[#A97142]/20">
+                  <Button variant="outline" className="w-full justify-start border-[#A97142] text-[#8B4513] font-semibold hover:bg-[#A97142]/20 hover:text-[#5C2E0D]">
                     <Send className="w-4 h-4 mr-2" />
                     Request a Market
                   </Button>
                 </Link>
                 <Link to={createPageUrl("Leaderboard")}>
-                  <Button variant="outline" className="w-full justify-start border-[#A97142] text-[#FAF3E0] hover:bg-[#A97142]/20">
+                  <Button variant="outline" className="w-full justify-start border-[#A97142] text-[#8B4513] font-semibold hover:bg-[#A97142]/20 hover:text-[#5C2E0D]">
                     <Trophy className="w-4 h-4 mr-2" />
                     View Leaderboard
                   </Button>

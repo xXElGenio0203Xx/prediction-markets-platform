@@ -56,6 +56,13 @@ enum TransferStatus {
   FAILED
 }
 
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CREATED
+}
+
 // User model
 model User {
   id           String   @id @default(uuid())
@@ -74,6 +81,7 @@ model User {
   positions Position[]
   transfers Transfer[]
   markets   Market[]    @relation("MarketCreator")
+  reviewedMarketRequests MarketRequest[] @relation("MarketRequestReviewer")
 
   @@index([email])
   @@index([role])
@@ -125,6 +133,7 @@ model Market {
   trades    Trade[]
   positions Position[]
   candles   Candle[]
+  createdFromRequest MarketRequest? @relation("CreatedFromRequest")
 
   @@index([slug])
   @@index([status])
@@ -259,4 +268,30 @@ model Candle {
 
   @@unique([marketId, outcome, timeframe, timestamp])
   @@index([marketId, outcome, timeframe, timestamp])
+}
+
+// Market Request model for user-submitted market suggestions
+model MarketRequest {
+  id                   String        @id @default(uuid())
+  title                String
+  description          String?
+  category             String
+  resolutionCriteria   String
+  suggestedCloseDate   DateTime?
+  requestedBy          String?
+  requesterEmail       String?
+  status               RequestStatus @default(PENDING)
+  adminNotes           String?
+  reviewedBy           String?
+  reviewedAt           DateTime?
+  createdMarketId      String?       @unique
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  reviewer      User?   @relation("MarketRequestReviewer", fields: [reviewedBy], references: [id])
+  createdMarket Market? @relation("CreatedFromRequest", fields: [createdMarketId], references: [id])
+
+  @@index([status])
+  @@index([requestedBy])
+  @@index([createdAt])
 }

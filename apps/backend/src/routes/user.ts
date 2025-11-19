@@ -208,6 +208,86 @@ const userRoutes: FastifyPluginAsync = async (fastify) => {
       },
     };
   });
+
+  // Get leaderboard
+  fastify.get('/leaderboard', async (request) => {
+    const { limit = 50 } = request.query as any;
+
+    // Get all users with their portfolio stats
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        balance: true,
+        positions: {
+          include: {
+            market: true,
+          },
+        },
+        trades: {
+          select: {
+            id: true,
+            buyerId: true,
+            quantity: true,
+            price: true,
+          },
+        },
+      },
+    });
+
+    // Calculate portfolio value for each user
+    const leaderboardData = users.map(user => {
+      const availableBalance = user.balance ? Number(user.balance.available) : 0;
+      let totalPositionValue = 0;
+      let totalProfitLoss = 0;
+
+      user.positions.forEach(position => {
+        const currentPrice = position.outcome === 'YES'
+          ? Number(position.market.yesPrice)
+          : Number(position.market.noPrice);
+        
+        const quantity = Number(position.quantity);
+        const avgPrice = Number(position.averagePrice);
+        const positionValue = quantity * currentPrice;
+        const costBasis = quantity * avgPrice;
+        
+        totalPositionValue += positionValue;
+        totalProfitLoss += (positionValue - costBasis);
+      });
+
+      const totalValue = availableBalance + totalPositionValue;
+      const totalTrades = user.trades.length;
+      const portfolioReturn = totalValue > 0 ? ((totalValue - 1000) / 1000) * 100 : 0;
+
+      return {
+        user_id: user.id,
+        email: user.email,
+        full_name: user.fullName || user.email.split('@')[0],
+        portfolio_value: totalValue,
+        profit_loss: totalProfitLoss,
+        total_return: portfolioReturn,
+        total_trades: totalTrades,
+        active_positions: user.positions.length,
+      };
+    });
+
+    // Sort by total value descending and take top N
+    leaderboardData.sort((a, b) => b.portfolio_value - a.portfolio_value);
+    const topUsers = leaderboardData.slice(0, Number(limit));
+
+    // Add rank to each user
+    const rankedLeaderboard = topUsers.map((user, index) => ({
+      ...user,
+      rank: index + 1,
+    }));
+
+    return {
+      leaderboard: rankedLeaderboard,
+      totalUsers: users.length,
+      updatedAt: new Date().toISOString(),
+    };
+  });
 };
 
 export default userRoutes;
