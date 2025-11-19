@@ -9,17 +9,34 @@ import { Download, Filter, TrendingUp, TrendingDown } from 'lucide-react';
 
 export default function TradeHistory() {
   const [filters, setFilters] = useState({
-    outcome: '',
-    side: '',
+    outcome: 'all',
+    side: 'all',
     start: '',
     end: '',
     limit: 50,
     offset: 0,
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['trade-history', filters],
-    queryFn: () => api.getTradeHistory(filters),
+    queryFn: async () => {
+      console.log('📊 TradeHistory: Fetching trades...');
+      try {
+        // Convert 'all' back to empty string for API
+        const apiFilters = {
+          ...filters,
+          outcome: filters.outcome === 'all' ? '' : filters.outcome,
+          side: filters.side === 'all' ? '' : filters.side,
+        };
+        const result = await api.getTradeHistory(apiFilters);
+        console.log('📊 TradeHistory: Got data:', result);
+        return result;
+      } catch (err) {
+        console.error('❌ TradeHistory: Error:', err);
+        throw err;
+      }
+    },
+    retry: false,
   });
 
   const handleExport = async () => {
@@ -44,7 +61,22 @@ export default function TradeHistory() {
   };
 
   if (isLoading) {
-    return <div className="container mx-auto py-8">Loading...</div>;
+    return (
+      <div className="container mx-auto py-8">
+        <div className="text-center">Loading trade history...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="text-center text-red-500">
+          <p>Error loading trade history: {error.message}</p>
+          <p className="text-sm mt-2">Please make sure you're logged in.</p>
+        </div>
+      </div>
+    );
   }
 
   const { trades = [], pagination, summary } = data || {};
@@ -121,28 +153,28 @@ export default function TradeHistory() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Select
-              value={filters.outcome}
-              onValueChange={(value) => handleFilterChange('outcome', value)}
+              value={filters.outcome || 'all'}
+              onValueChange={(value) => handleFilterChange('outcome', value === 'all' ? '' : value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Outcome" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Outcomes</SelectItem>
+                <SelectItem value="all">All Outcomes</SelectItem>
                 <SelectItem value="YES">YES</SelectItem>
                 <SelectItem value="NO">NO</SelectItem>
               </SelectContent>
             </Select>
 
             <Select
-              value={filters.side}
-              onValueChange={(value) => handleFilterChange('side', value)}
+              value={filters.side || 'all'}
+              onValueChange={(value) => handleFilterChange('side', value === 'all' ? '' : value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Side" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Sides</SelectItem>
+                <SelectItem value="all">All Sides</SelectItem>
                 <SelectItem value="BUY">BUY</SelectItem>
                 <SelectItem value="SELL">SELL</SelectItem>
               </SelectContent>
@@ -165,8 +197,8 @@ export default function TradeHistory() {
             <Button
               variant="outline"
               onClick={() => setFilters({
-                outcome: '',
-                side: '',
+                outcome: 'all',
+                side: 'all',
                 start: '',
                 end: '',
                 limit: 50,

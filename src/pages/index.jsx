@@ -16,6 +16,8 @@ import AllMarkets from "./AllMarkets";
 
 import Admin from "./Admin";
 
+import MarketRequests from "./MarketRequests";
+
 import PortfolioAnalytics from "./PortfolioAnalytics";
 
 import MarketAnalytics from "./MarketAnalytics";
@@ -23,6 +25,8 @@ import MarketAnalytics from "./MarketAnalytics";
 import TradeHistory from "./TradeHistory";
 
 import PlatformMetrics from "./PlatformMetrics";
+
+import Login from "./Login";
 
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
@@ -44,6 +48,8 @@ const PAGES = {
     
     Admin: Admin,
     
+    MarketRequests: MarketRequests,
+    
     PortfolioAnalytics: PortfolioAnalytics,
     
     MarketAnalytics: MarketAnalytics,
@@ -51,6 +57,8 @@ const PAGES = {
     TradeHistory: TradeHistory,
     
     PlatformMetrics: PlatformMetrics,
+    
+    Login: Login,
     
 }
 
@@ -71,6 +79,15 @@ function _getCurrentPage(url) {
 function PagesContent() {
     const location = useLocation();
     const currentPage = _getCurrentPage(location.pathname);
+    
+    // Login page doesn't need the Layout wrapper
+    if (location.pathname.toLowerCase() === '/login') {
+        return (
+            <Routes>
+                <Route path="/Login" element={<Login />} />
+            </Routes>
+        );
+    }
     
     return (
         <Layout currentPageName={currentPage}>
@@ -94,6 +111,8 @@ function PagesContent() {
                 <Route path="/AllMarkets" element={<AllMarkets />} />
                 
                 <Route path="/Admin" element={<Admin />} />
+                
+                <Route path="/MarketRequests" element={<MarketRequests />} />
                 
                 <Route path="/PortfolioAnalytics" element={<PortfolioAnalytics />} />
                 

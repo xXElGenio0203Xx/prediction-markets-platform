@@ -31,7 +31,7 @@ const MarketUpdateSubscriber = React.memo(({ marketId, onUpdate }) => {
   return null; // This component does not render anything
 });
 
-export default function PortfolioPage({ user: userFromLayout }) {
+export default function PortfolioPage({ user: userProp }) {
   const [positions, setPositions] = useState([]);
   const [markets, setMarkets] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -41,96 +41,82 @@ export default function PortfolioPage({ user: userFromLayout }) {
   const [activeMarketIds, setActiveMarketIds] = useState([]);
   const [cancellingOrder, setCancellingOrder] = useState(null);
 
-  // Memoize loadPortfolioData to make it stable for dependencies in other hooks
-  const loadPortfolioData = useCallback(async (userEmail) => {
+  // Load portfolio data
+  const loadPortfolioData = async () => {
     setIsLoading(true);
     try {
-      const userId = userEmail;
-
-      // Load portfolio calculation
-      const portfolioCalc = await api.getPortfolio();
-
-      // Add defensive checks
-      if (portfolioCalc && portfolioCalc.data) {
-        setPortfolioData(portfolioCalc.data);
-      } else if (portfolioCalc) {
-        // Handle case where response is direct object, not wrapped in data
-        setPortfolioData(portfolioCalc);
-      } else {
-        // Set default portfolio data
-        setPortfolioData({
-          cash_balance: 100,
-          portfolio_value: 100,
-          unrealized_pnl: 0,
-          total_return: 0,
-          total_trades: 0,
-          position_count: 0,
-          positions: []
-        });
-      }
-
       // Load positions
-      const positionsData = await Position.filter({ user_id: userId });
+      const positionsResponse = await api.getPositions();
+      const positionsData = positionsResponse.positions || [];
       setPositions(positionsData);
+
+      // Load portfolio summary
+      const portfolioResponse = await api.getPortfolio();
+      setPortfolioData(portfolioResponse.summary || {});
 
       // Track which markets user has positions in for realtime updates
       if (positionsData && positionsData.length > 0) {
-        const marketIds = [...new Set(positionsData.map(p => p.market_id))];
+        const marketIds = [...new Set(positionsData.map(p => p.marketId))];
         setActiveMarketIds(marketIds);
       } else {
-        setActiveMarketIds([]); // Clear if no positions
+        setActiveMarketIds([]);
       }
-
-      // Load orders
-      const ordersData = await Order.filter({ user_id: userId });
-      setOrders(ordersData);
-
-      // Load markets
-      const marketsData = await Market.list();
-      setMarkets(marketsData);
     } catch (error) {
       console.error("Error loading portfolio:", error);
       // Set default portfolio data on error
       setPortfolioData({
-        cash_balance: 100,
-        portfolio_value: 100,
-        unrealized_pnl: 0,
-        total_return: 0,
-        total_trades: 0,
-        position_count: 0,
-        positions: []
+        availableBalance: 0,
+        totalValue: 0,
+        totalProfitLoss: 0,
+        portfolioReturn: 0,
+        openPositionsCount: 0,
+        totalPositionsCount: 0
       });
-      setActiveMarketIds([]); // Clear on error
+      setActiveMarketIds([]);
     }
     setIsLoading(false);
-  }, [setIsLoading, setPositions, setOrders, setMarkets, setPortfolioData, setActiveMarketIds]); // All state setters are stable
+  };
 
   useEffect(() => {
-    setIsLoading(true);
-    setPositions([]);
-    setOrders([]);
-    setMarkets([]);
-    setPortfolioData(null);
-    setActiveMarketIds([]); // Clear active market IDs on user change/logout
+    const initPortfolio = async () => {
+      const token = localStorage.getItem('accessToken');
+      console.log('📊 Portfolio: Token exists:', !!token);
+      console.log('📊 Portfolio: User prop received:', userProp);
+      
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
 
-    if (userFromLayout) {
-      setUser(userFromLayout);
-      loadPortfolioData(userFromLayout.email);
-    } else {
-      setUser(null);
-      setIsLoading(false);
-    }
-  }, [userFromLayout, loadPortfolioData]); // loadPortfolioData is now a stable dependency
+      // If we have userProp, use it, otherwise fetch current user
+      if (userProp) {
+        setUser(userProp);
+        await loadPortfolioData();
+      } else {
+        try {
+          const currentUser = await api.getCurrentUser();
+          console.log('📊 Portfolio: Fetched current user:', currentUser);
+          setUser(currentUser);
+          await loadPortfolioData();
+        } catch (error) {
+          console.error('Failed to fetch current user:', error);
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    initPortfolio();
+  }, [userProp]);
 
   // Callback for handling real-time market updates
-  const handlePortfolioUpdate = useCallback((update) => {
+  const handlePortfolioUpdate = (update) => {
     console.log('📊 Portfolio update received:', update);
 
     // Reload portfolio when trades happen in user's markets or market data changes
     if (user && (update.type === 'trade_executed' || update.type === 'market_updated')) {
-      loadPortfolioData(user.email);
+      loadPortfolioData();
     }
-  }, [user, loadPortfolioData]);
+  };
 
   const handleCancelOrder = async (orderId) => {
     if (!confirm('Are you sure you want to cancel this order?')) {
@@ -152,7 +138,7 @@ export default function PortfolioPage({ user: userFromLayout }) {
   const statsCards = portfolioData ? [
     {
       title: "Cash Balance",
-      value: `$${(portfolioData.cash_balance || 0).toFixed(2)}`,
+      value: `$${(portfolioData.availableBalance || 0).toFixed(2)}`,
       subtext: "Bruno Dollars",
       icon: Wallet,
       color: "text-blue-600",
@@ -161,26 +147,26 @@ export default function PortfolioPage({ user: userFromLayout }) {
     },
     {
       title: "Portfolio Value",
-      value: `$${(portfolioData.portfolio_value || 0).toFixed(2)}`,
-      subtext: (portfolioData.total_return || 0) >= 0 ? `+${(portfolioData.total_return || 0).toFixed(1)}%` : `${(portfolioData.total_return || 0).toFixed(1)}%`,
-      icon: (portfolioData.total_return || 0) >= 0 ? TrendingUp : TrendingDown,
-      color: (portfolioData.total_return || 0) >= 0 ? "text-green-600" : "text-red-600",
-      bgColor: (portfolioData.total_return || 0) >= 0 ? "bg-green-100" : "bg-red-100",
-      borderColor: (portfolioData.total_return || 0) >= 0 ? "border-green-300" : "border-red-300"
+      value: `$${(portfolioData.totalValue || 0).toFixed(2)}`,
+      subtext: (portfolioData.portfolioReturn || 0) >= 0 ? `+${(portfolioData.portfolioReturn || 0).toFixed(1)}%` : `${(portfolioData.portfolioReturn || 0).toFixed(1)}%`,
+      icon: (portfolioData.portfolioReturn || 0) >= 0 ? TrendingUp : TrendingDown,
+      color: (portfolioData.portfolioReturn || 0) >= 0 ? "text-green-600" : "text-red-600",
+      bgColor: (portfolioData.portfolioReturn || 0) >= 0 ? "bg-green-100" : "bg-red-100",
+      borderColor: (portfolioData.portfolioReturn || 0) >= 0 ? "border-green-300" : "border-red-300"
     },
     {
       title: "Unrealized P/L",
-      value: `$${(portfolioData.unrealized_pnl || 0).toFixed(2)}`,
+      value: `$${(portfolioData.totalProfitLoss || 0).toFixed(2)}`,
       subtext: "Marked to market",
-      icon: (portfolioData.unrealized_pnl || 0) >= 0 ? ArrowUpRight : ArrowDownRight,
-      color: (portfolioData.unrealized_pnl || 0) >= 0 ? "text-green-600" : "text-red-600",
-      bgColor: (portfolioData.unrealized_pnl || 0) >= 0 ? "bg-green-100" : "bg-red-100",
-      borderColor: (portfolioData.unrealized_pnl || 0) >= 0 ? "border-green-300" : "border-red-300"
+      icon: (portfolioData.totalProfitLoss || 0) >= 0 ? ArrowUpRight : ArrowDownRight,
+      color: (portfolioData.totalProfitLoss || 0) >= 0 ? "text-green-600" : "text-red-600",
+      bgColor: (portfolioData.totalProfitLoss || 0) >= 0 ? "bg-green-100" : "bg-red-100",
+      borderColor: (portfolioData.totalProfitLoss || 0) >= 0 ? "border-green-300" : "border-red-300"
     },
     {
-      title: "Total Trades",
-      value: (portfolioData.total_trades || 0).toString(),
-      subtext: `${portfolioData.position_count || 0} positions`,
+      title: "Open Positions",
+      value: (portfolioData.openPositionsCount || 0).toString(),
+      subtext: `${portfolioData.totalPositionsCount || 0} total`,
       icon: BarChart3,
       color: "text-amber-600",
       bgColor: "bg-amber-100",
@@ -248,7 +234,7 @@ export default function PortfolioPage({ user: userFromLayout }) {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-2 border-[#A97142] text-[#FAF3E0] hover:bg-[#A97142]/20"
+                className="border-2 border-[#A97142] text-[#4E3629] font-semibold hover:bg-[#A97142]/20"
               >
                 <Trophy className="w-4 h-4 mr-2" />
                 Leaderboard
@@ -466,19 +452,19 @@ export default function PortfolioPage({ user: userFromLayout }) {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Link to={createPageUrl("Markets")}>
-                  <Button variant="outline" className="w-full justify-start border-[#A97142] text-[#FAF3E0] hover:bg-[#A97142]/20">
+                  <Button variant="outline" className="w-full justify-start border-[#A97142] text-[#8B4513] font-semibold hover:bg-[#A97142]/20 hover:text-[#5C2E0D]">
                     <ArrowUpRight className="w-4 h-4 mr-2" />
                     Browse Markets
                   </Button>
                 </Link>
                 <Link to={createPageUrl("RequestMarket")}>
-                  <Button variant="outline" className="w-full justify-start border-[#A97142] text-[#FAF3E0] hover:bg-[#A97142]/20">
+                  <Button variant="outline" className="w-full justify-start border-[#A97142] text-[#8B4513] font-semibold hover:bg-[#A97142]/20 hover:text-[#5C2E0D]">
                     <Send className="w-4 h-4 mr-2" />
                     Request a Market
                   </Button>
                 </Link>
                 <Link to={createPageUrl("Leaderboard")}>
-                  <Button variant="outline" className="w-full justify-start border-[#A97142] text-[#FAF3E0] hover:bg-[#A97142]/20">
+                  <Button variant="outline" className="w-full justify-start border-[#A97142] text-[#8B4513] font-semibold hover:bg-[#A97142]/20 hover:text-[#5C2E0D]">
                     <Trophy className="w-4 h-4 mr-2" />
                     View Leaderboard
                   </Button>

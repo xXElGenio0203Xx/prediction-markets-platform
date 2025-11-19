@@ -1,11 +1,22 @@
 
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/api/hooks";
+import { api } from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Info, TrendingUp, Star, Trophy, Clock, Users, DollarSign } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ArrowLeft, Info, TrendingUp, Star, Trophy, Clock, Users, DollarSign, CheckCircle, XCircle, Shield } from "lucide-react";
 import { createPageUrl } from "@/utils";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
@@ -28,9 +39,10 @@ const mockPriceHistory = [
   { date: "Jan 06", price: 0.73 },
 ];
 
-export default function MarketPage({ user }) {
+export default function MarketPage({ user: userProp }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [user, setUser] = useState(userProp);
   const [market, setMarket] = useState(null);
   const [orders, setOrders] = useState([]);
   const [userOrders, setUserOrders] = useState([]);
@@ -38,56 +50,90 @@ export default function MarketPage({ user }) {
   const [selectedOutcome, setSelectedOutcome] = useState('yes');
   const [isWatchlisted, setIsWatchlisted] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
+  
+  // Resolution dialog state
+  const [showResolutionDialog, setShowResolutionDialog] = useState(false);
+  const [resolutionOutcome, setResolutionOutcome] = useState(null);
+  const [resolutionReason, setResolutionReason] = useState('');
+  const [isResolving, setIsResolving] = useState(false);
 
   const userId = user ? user.email : 'anonymous-user';
+
+  // Fetch current user if not provided
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      if (!userProp) {
+        try {
+          const currentUser = await api.getCurrentUser();
+          setUser(currentUser);
+        } catch (error) {
+          console.log('No user authenticated');
+        }
+      }
+    };
+    fetchCurrentUser();
+  }, [userProp]);
 
   useEffect(() => {
     const fetchMarketData = async () => {
       setIsLoading(true);
       const searchParams = new URLSearchParams(location.search);
-      const marketId = searchParams.get('id');
+      const marketSlug = searchParams.get('slug') || searchParams.get('id');
 
-      let marketDataForState = null;
-      let ordersForState = [];
-      let userOrdersForState = [];
+      console.log('📊 Market: Loading market with slug:', marketSlug);
 
       try {
-        if (marketId) {
-            const allMarkets = await MarketEntity.list();
-            const foundMarket = allMarkets.find(m => m.id === marketId);
-
-            if (foundMarket) {
-              // Add special override for specific markets
-              if (foundMarket.title.includes("Michelle Obama be the 2025 commencement speaker")) {
-                foundMarket.image_url = "/market-default.svg";
-              }
-              marketDataForState = foundMarket;
-            } else {
-              marketDataForState = createDemoMarket(marketId);
-            }
-            ordersForState = await Order.filter({ market_id: marketId });
-            userOrdersForState = await Order.filter({ market_id: marketId, user_id: userId });
+        if (marketSlug) {
+          // Fetch market by slug
+          const marketData = await api.getMarket(marketSlug);
+          console.log('📊 Market: Got market data:', marketData);
+          
+          // Map backend fields to frontend format
+          const mappedMarket = {
+            ...marketData,
+            image_url: marketData.imageUrl,
+            resolution_date: marketData.closeTime,
+            current_price: marketData.yesPrice,
+            status: marketData.status.toLowerCase(),
+          };
+          
+          setMarket(mappedMarket);
+          
+          // Fetch orderbook
+          try {
+            const orderbookData = await api.getOrderbook(marketSlug);
+            console.log('📊 Market: Got orderbook:', orderbookData);
+            setOrders(orderbookData.orders || []);
+          } catch (err) {
+            console.log('📊 Market: No orderbook data');
+            setOrders([]);
+          }
+          
+          // TODO: Fetch user orders when endpoint available
+          setUserOrders([]);
         } else {
-            const defaultMarketId = "demo-weather-market";
-            marketDataForState = createDemoMarket(defaultMarketId);
-            ordersForState = await Order.filter({ market_id: defaultMarketId });
-            userOrdersForState = await Order.filter({ market_id: defaultMarketId, user_id: userId });
+          // No market specified, load first market or show error
+          const response = await api.getMarkets();
+          if (response.markets && response.markets.length > 0) {
+            const firstMarket = response.markets[0];
+            navigate(`${location.pathname}?slug=${firstMarket.slug}`, { replace: true });
+          } else {
+            console.error('No markets available');
+            setMarket(null);
+          }
         }
       } catch (error) {
-        console.error("Error loading market:", error);
-        marketDataForState = createDemoMarket(`error-market-${Date.now()}`);
-        ordersForState = [];
-        userOrdersForState = [];
+        console.error("❌ Error loading market:", error);
+        setMarket(null);
+        setOrders([]);
+        setUserOrders([]);
       }
 
-      setMarket(marketDataForState);
-      setOrders(ordersForState);
-      setUserOrders(userOrdersForState);
       setIsLoading(false);
     };
 
     fetchMarketData();
-  }, [location.search, userId]);
+  }, [location.search, userId, navigate]);
 
   const createDemoMarket = (id) => ({
     id: id,
@@ -104,18 +150,25 @@ export default function MarketPage({ user }) {
   });
 
   const handleOrderPlaced = async () => {
-    if (market && market.id) {
-      const searchParams = new URLSearchParams(location.search);
-      const originalMarketId = searchParams.get('id') || market.id;
-
-      const marketOrders = await Order.filter({ market_id: originalMarketId });
-      setOrders(marketOrders);
-
-      const userMarketOrders = await Order.filter({
-        market_id: originalMarketId,
-        user_id: userId
-      });
-      setUserOrders(userMarketOrders);
+    if (market && market.slug) {
+      console.log('📊 Market: Order placed, refreshing orderbook...');
+      try {
+        const orderbookData = await api.getOrderbook(market.slug);
+        setOrders(orderbookData.orders || []);
+        
+        // Refresh market data to get updated prices
+        const marketData = await api.getMarket(market.slug);
+        const mappedMarket = {
+          ...marketData,
+          image_url: marketData.imageUrl,
+          resolution_date: marketData.closeTime,
+          current_price: marketData.yesPrice,
+          status: marketData.status.toLowerCase(),
+        };
+        setMarket(mappedMarket);
+      } catch (error) {
+        console.error('Error refreshing after order:', error);
+      }
     }
   };
 
@@ -147,6 +200,46 @@ export default function MarketPage({ user }) {
 
   // Subscribe to updates
   useMarketUpdates(market?.id, handleMarketUpdate);
+
+  // Resolution handlers
+  const handleOpenResolutionDialog = (outcome) => {
+    setResolutionOutcome(outcome);
+    setResolutionReason('');
+    setShowResolutionDialog(true);
+  };
+
+  const handleConfirmResolution = async () => {
+    if (!resolutionReason.trim()) {
+      alert('Please provide a resolution reason');
+      return;
+    }
+
+    setIsResolving(true);
+    try {
+      const outcome = resolutionOutcome ? 'YES' : 'NO';
+      await api.resolveMarket(market.slug, outcome, resolutionReason);
+      
+      alert(`✅ Market resolved successfully!\n\nOutcome: ${outcome}\nReason: ${resolutionReason}`);
+      
+      // Reload market data
+      const marketData = await api.getMarket(market.slug);
+      const mappedMarket = {
+        ...marketData,
+        image_url: marketData.imageUrl,
+        resolution_date: marketData.closeTime,
+        current_price: marketData.yesPrice,
+        status: marketData.status.toLowerCase(),
+        outcome: marketData.outcome,
+        resolutionSource: marketData.resolutionSource,
+      };
+      setMarket(mappedMarket);
+      setShowResolutionDialog(false);
+    } catch (error) {
+      console.error('Error resolving market:', error);
+      alert(`❌ Failed to resolve market: ${error.message}`);
+    }
+    setIsResolving(false);
+  };
 
   if (isLoading) {
     return (
@@ -229,6 +322,27 @@ export default function MarketPage({ user }) {
 
             {/* Actions */}
             <div className="flex items-center gap-2">
+              {/* Admin Resolution Buttons - Only show for ADMIN on OPEN markets */}
+              {user?.role === 'ADMIN' && market.status === 'open' && (
+                <>
+                  <Button
+                    onClick={() => handleOpenResolutionDialog(true)}
+                    className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Resolve YES
+                  </Button>
+                  <Button
+                    onClick={() => handleOpenResolutionDialog(false)}
+                    className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-2"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    Resolve NO
+                  </Button>
+                </>
+              )}
+              
+              {/* Regular user actions */}
               <Button
                 variant="outline"
                 size="icon"
@@ -249,20 +363,49 @@ export default function MarketPage({ user }) {
           </div>
         </div>
 
+        {/* Market Status Banner - Show if resolved */}
+        {market.status === 'resolved' && market.outcome && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`mb-6 p-4 rounded-xl border-2 ${
+              market.outcome === 'YES' 
+                ? 'bg-green-50 border-green-500' 
+                : 'bg-red-50 border-red-500'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Shield className={`w-6 h-6 ${market.outcome === 'YES' ? 'text-green-600' : 'text-red-600'}`} />
+              <div className="flex-1">
+                <h3 className={`font-bold text-lg ${market.outcome === 'YES' ? 'text-green-900' : 'text-red-900'}`}>
+                  Market Resolved: {market.outcome}
+                </h3>
+                {market.resolutionSource && (
+                  <p className={`text-sm mt-1 ${market.outcome === 'YES' ? 'text-green-700' : 'text-red-700'}`}>
+                    <strong>Resolution Reason:</strong> {market.resolutionSource}
+                  </p>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Main Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left Column - Chart & Trade (70% width) */}
           <div className="lg:col-span-3 space-y-6">
             {/* Price Chart */}
-            <Card className="bg-white/80 backdrop-blur-sm border-2 border-[#4E3629]/10 shadow-lg rounded-2xl overflow-hidden">
+            <Card className={`bg-white/80 backdrop-blur-sm border-2 border-[#4E3629]/10 shadow-lg rounded-2xl overflow-hidden ${
+              market.status === 'resolved' ? 'grayscale opacity-75' : ''
+            }`}>
               <CardHeader className="border-b border-[#4E3629]/5">
                 <CardTitle className="text-lg font-semibold text-[#4E3629] flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-[#A97142]" />
-                  Price Chart
+                  Price Chart {market.status === 'resolved' && <span className="text-xs text-gray-500">(Market Resolved)</span>}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
-                <MarketChart priceHistory={mockPriceHistory} />
+                <MarketChart priceHistory={mockPriceHistory} isResolved={market.status === 'resolved'} />
               </CardContent>
             </Card>
 
@@ -302,6 +445,85 @@ export default function MarketPage({ user }) {
           </motion.div>
         </div>
       )}
+
+      {/* Resolution Dialog */}
+      <Dialog open={showResolutionDialog} onOpenChange={setShowResolutionDialog}>
+        <DialogContent className="bg-white border-2 border-[#A97142]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-[#4E3629] flex items-center gap-2">
+              <Shield className={`w-6 h-6 ${resolutionOutcome ? 'text-green-600' : 'text-red-600'}`} />
+              Resolve Market: {resolutionOutcome ? 'YES' : 'NO'}
+            </DialogTitle>
+            <DialogDescription className="text-[#4E3629]/70">
+              This action will finalize the market outcome and distribute winnings to holders of {resolutionOutcome ? 'YES' : 'NO'} shares.
+              All losing shares will become worthless.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-semibold text-[#4E3629] mb-2 block">
+                Market Question
+              </label>
+              <p className="text-[#4E3629]/80 text-sm bg-[#FAF3E0] p-3 rounded-lg">
+                {market?.title || market?.question}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-[#4E3629] mb-2 block">
+                Resolution Reason *
+              </label>
+              <Textarea
+                placeholder="Explain why this market is being resolved to this outcome (e.g., 'It did not snow in Providence on this date according to NOAA weather data')"
+                value={resolutionReason}
+                onChange={(e) => setResolutionReason(e.target.value)}
+                className="min-h-[120px] border-[#A97142] focus:border-[#8B5A3C]"
+              />
+              <p className="text-xs text-[#4E3629]/60 mt-1">
+                This reason will be permanently displayed on the market page.
+              </p>
+            </div>
+
+            <div className={`p-4 rounded-lg border-2 ${resolutionOutcome ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-500'}`}>
+              <h4 className={`font-bold mb-2 ${resolutionOutcome ? 'text-green-900' : 'text-red-900'}`}>
+                ⚠️ Warning: This action is irreversible
+              </h4>
+              <ul className={`text-sm space-y-1 ${resolutionOutcome ? 'text-green-700' : 'text-red-700'}`}>
+                <li>✓ {resolutionOutcome ? 'YES' : 'NO'} share holders will receive $1 per share</li>
+                <li>✗ {resolutionOutcome ? 'NO' : 'YES'} share holders will lose their investment</li>
+                <li>↩ Open orders will be cancelled and refunded</li>
+                <li>🔒 The market will be permanently closed to trading</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowResolutionDialog(false)}
+              disabled={isResolving}
+              className="border-[#A97142] text-[#4E3629]"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmResolution}
+              disabled={isResolving || !resolutionReason.trim()}
+              className={`${resolutionOutcome ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} text-white`}
+            >
+              {isResolving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Resolving...
+                </>
+              ) : (
+                `Confirm Resolution: ${resolutionOutcome ? 'YES' : 'NO'}`
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

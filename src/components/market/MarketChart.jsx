@@ -1,7 +1,7 @@
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-export default function MarketChart({ priceHistory }) {
+export default function MarketChart({ priceHistory, isResolved = false }) {
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       return (
@@ -15,29 +15,35 @@ export default function MarketChart({ priceHistory }) {
     return null;
   };
 
+  // Use grayscale colors when market is resolved
+  const strokeColor = isResolved ? '#666666' : '#A97142';
+  const fillColor = isResolved ? '#888888' : '#A97142';
+  const gridColor = isResolved ? '#999999' : '#4E3629';
+  const textColor = isResolved ? '#666666' : '#4E3629';
+
   return (
     <div className="h-80">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={priceHistory} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
           <defs>
-            <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#A97142" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="#A97142" stopOpacity={0}/>
+            <linearGradient id={isResolved ? "colorPriceGray" : "colorPrice"} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={fillColor} stopOpacity={0.3}/>
+              <stop offset="95%" stopColor={fillColor} stopOpacity={0}/>
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#4E3629" strokeOpacity={0.1} />
+          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} strokeOpacity={0.1} />
           <XAxis 
             dataKey="date" 
-            stroke="#4E3629" 
+            stroke={gridColor} 
             strokeOpacity={0.5}
-            tick={{ fill: '#4E3629', opacity: 0.6 }}
+            tick={{ fill: textColor, opacity: 0.6 }}
             fontSize={12}
           />
           <YAxis 
             domain={[0, 1]} 
-            stroke="#4E3629" 
+            stroke={gridColor} 
             strokeOpacity={0.5}
-            tick={{ fill: '#4E3629', opacity: 0.6 }}
+            tick={{ fill: textColor, opacity: 0.6 }}
             fontSize={12}
             tickFormatter={(value) => `$${value.toFixed(2)}`}
           />
@@ -45,10 +51,10 @@ export default function MarketChart({ priceHistory }) {
           <Area 
             type="monotone" 
             dataKey="price" 
-            stroke="#A97142" 
+            stroke={strokeColor} 
             strokeWidth={3}
             fillOpacity={1} 
-            fill="url(#colorPrice)" 
+            fill={`url(#${isResolved ? 'colorPriceGray' : 'colorPrice'})`} 
           />
         </AreaChart>
       </ResponsiveContainer>

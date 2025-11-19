@@ -1,13 +1,18 @@
 /**
  * API Client for Prediction Markets Backend
  * Connects to Fastify backend with JWT authentication
+ * Version: 2.0 (with /api prefix fix)
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+
+console.log('📦 API Base URL configured as:', API_BASE_URL);
+console.log('📦 VITE_API_URL env var:', import.meta.env.VITE_API_URL);
 
 class APIClient {
   constructor() {
     this.baseUrl = API_BASE_URL;
+    console.log('🔧 APIClient initialized with baseUrl:', this.baseUrl);
   }
 
   /**
@@ -15,11 +20,16 @@ class APIClient {
    */
   async request(endpoint, options = {}) {
     const url = `${this.baseUrl}${endpoint}`;
+    console.log('🌐 API Request:', url);
+    
+    // Get access token from localStorage
+    const accessToken = localStorage.getItem('accessToken');
     
     const config = {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
         ...options.headers,
       },
       credentials: 'include', // Include HTTP-only cookies
@@ -77,7 +87,7 @@ class APIClient {
   async register(email, password, displayName) {
     return this.request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, displayName }),
+      body: JSON.stringify({ email, password, fullName: displayName }),
     });
   }
 
@@ -89,9 +99,12 @@ class APIClient {
   }
 
   async logout() {
-    return this.request('/auth/logout', {
+    const result = await this.request('/auth/logout', {
       method: 'POST',
     });
+    // Clear access token from localStorage
+    localStorage.removeItem('accessToken');
+    return result;
   }
 
   async getCurrentUser() {
@@ -252,8 +265,13 @@ class APIClient {
    * Export trades to CSV
    */
   async exportTrades() {
-    const response = await fetch(`${this.baseURL}/analytics/trades/export`, {
-      headers: this.getHeaders(),
+    const accessToken = localStorage.getItem('accessToken');
+    
+    const response = await fetch(`${this.baseUrl}/analytics/trades/export`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      credentials: 'include',
     });
 
     if (!response.ok) {
@@ -277,6 +295,70 @@ class APIClient {
    */
   async getPlatformMetrics(period = '30d') {
     return this.request(`/analytics/admin/platform?period=${period}`);
+  }
+
+  // ============================================
+  // MARKET REQUESTS METHODS
+  // ============================================
+
+  /**
+   * Submit a market request
+   * @param {Object} requestData - Market request data
+   */
+  async submitMarketRequest(requestData) {
+    return this.request('/market-requests', {
+      method: 'POST',
+      body: JSON.stringify(requestData),
+    });
+  }
+
+  /**
+   * Get all market requests (admin only)
+   * @param {Object} filters - Filter options
+   */
+  async getAllMarketRequests(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.page) params.append('page', filters.page.toString());
+    if (filters.pageSize) params.append('pageSize', filters.pageSize.toString());
+
+    const query = params.toString();
+    return this.request(`/market-requests/admin/all${query ? '?' + query : ''}`);
+  }
+
+  /**
+   * Get single market request details (admin only)
+   * @param {string} id - Request ID
+   */
+  async getMarketRequest(id) {
+    return this.request(`/market-requests/admin/${id}`);
+  }
+
+  /**
+   * Review a market request (admin only)
+   * @param {string} id - Request ID
+   * @param {string} status - 'APPROVED' or 'REJECTED'
+   * @param {string} adminNotes - Optional admin notes
+   */
+  async reviewMarketRequest(id, status, adminNotes) {
+    return this.request(`/market-requests/admin/${id}/review`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, adminNotes }),
+    });
+  }
+
+  /**
+   * Get user's own market requests
+   */
+  async getMyMarketRequests() {
+    return this.request('/market-requests/my-requests');
+  }
+
+  /**
+   * Get market request statistics (admin only)
+   */
+  async getMarketRequestStats() {
+    return this.request('/market-requests/admin/stats');
   }
 }
 

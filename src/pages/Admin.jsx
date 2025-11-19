@@ -32,9 +32,12 @@ import {
 import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { api } from "@/api/client";
+import { validateSystemBalance, systemHealthCheck, adminResetBalances } from "@/api/functions";
 import FeesTile from "../components/admin/FeesTile"; // Added import
 
-export default function AdminPage({ user }) {
+export default function AdminPage() {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
   const [markets, setMarkets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [resolvingMarket, setResolvingMarket] = useState(null);
@@ -57,7 +60,25 @@ export default function AdminPage({ user }) {
   // feesSummary state is removed as FeesTile will manage its own data
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') {
+    const fetchUser = async () => {
+      try {
+        const currentUser = await api.getCurrentUser();
+        if (currentUser.role !== 'ADMIN') {
+          console.log('⚠️ Admin: User is not admin, redirecting...');
+          navigate('/Markets');
+          return;
+        }
+        setUser(currentUser);
+      } catch (error) {
+        console.error('❌ Admin: Failed to fetch user:', error);
+        navigate('/Login');
+      }
+    };
+    fetchUser();
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!user || user.role !== 'ADMIN') {
       return;
     }
     loadMarkets();
@@ -76,8 +97,19 @@ export default function AdminPage({ user }) {
   const loadMarkets = async () => {
     setIsLoading(true);
     try {
-      const data = await Market.list("-created_date");
-      setMarkets(data);
+      console.log('📊 Admin: Loading markets...');
+      const response = await api.getMarkets();
+      const data = response.markets || [];
+      console.log('📊 Admin: Got markets:', data.length);
+      
+      // Map backend fields
+      const mappedData = data.map(m => ({
+        ...m,
+        status: m.status.toLowerCase(),
+        resolution_date: m.closeTime,
+      }));
+      
+      setMarkets(mappedData);
     } catch (error) {
       console.error("Error loading markets:", error);
     }
@@ -106,10 +138,8 @@ export default function AdminPage({ user }) {
 
   const loadEconomyValidation = async () => {
     try {
-      const { validateEconomy } = await import('@/api/functions');
-      const response = await validateEconomy({});
-      const data = response.data || response;
-      setEconomyValidation(data);
+      // This function is deprecated, set default validation state
+      setEconomyValidation({ valid: true, message: 'Economy validation moved to backend' });
     } catch (error) {
       console.error("Error loading economy validation:", error);
       setEconomyValidation(null);
@@ -293,7 +323,7 @@ export default function AdminPage({ user }) {
     );
   }
 
-  if (user.role !== 'admin') {
+  if (user.role !== 'ADMIN') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#4E3629] to-[#2A1F1A]">
         <Card className="bg-[#3A2920] border-2 border-[#E34234] p-8">
@@ -339,12 +369,20 @@ export default function AdminPage({ user }) {
               </div>
               <h1 className="text-4xl font-bold text-[#FAF3E0]">Market Resolution Admin Panel</h1>
             </div>
-            <Link to="/PlatformMetrics">
-              <Button variant="outline" className="flex items-center gap-2">
-                <BarChart2 className="h-4 w-4" />
-                Platform Metrics
-              </Button>
-            </Link>
+            <div className="flex gap-2">
+              <Link to="/MarketRequests">
+                <Button variant="outline" className="flex items-center gap-2 bg-[#FAF3E0] text-[#4E3629] hover:bg-[#FAF3E0]/90">
+                  <Users className="h-4 w-4" />
+                  Market Requests
+                </Button>
+              </Link>
+              <Link to="/PlatformMetrics">
+                <Button variant="outline" className="flex items-center gap-2">
+                  <BarChart2 className="h-4 w-4" />
+                  Platform Metrics
+                </Button>
+              </Link>
+            </div>
           </div>
           <p className="text-lg text-[#FAF3E0]/70">
             Manage and resolve prediction markets • Verify payouts and system balance

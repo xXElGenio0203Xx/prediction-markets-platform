@@ -24,14 +24,27 @@ export default function PortfolioAnalytics() {
 
   const { data: analytics, isLoading, error } = useQuery({
     queryKey: ['portfolio-analytics', period],
-    queryFn: () => api.getPortfolioAnalytics(period),
+    queryFn: async () => {
+      console.log('📊 PortfolioAnalytics: Fetching analytics for period:', period);
+      try {
+        const result = await api.getPortfolioAnalytics(period);
+        console.log('📊 PortfolioAnalytics: Got data:', result);
+        return result;
+      } catch (err) {
+        console.error('❌ PortfolioAnalytics: Error:', err);
+        throw err;
+      }
+    },
     refetchInterval: 60000, // Refetch every minute
+    retry: false,
   });
 
   if (isLoading) {
     return (
       <div className="container mx-auto py-8">
-        <div className="text-center">Loading analytics...</div>
+        <div className="text-center">
+          <p className="text-lg">Loading analytics...</p>
+        </div>
       </div>
     );
   }
@@ -39,25 +52,47 @@ export default function PortfolioAnalytics() {
   if (error) {
     return (
       <div className="container mx-auto py-8">
-        <div className="text-center text-red-500">Error loading analytics</div>
+        <div className="text-center text-red-500">
+          <p className="text-lg mb-2">Error loading analytics</p>
+          <p className="text-sm">{error.message}</p>
+          <p className="text-sm mt-2">Please make sure you're logged in.</p>
+        </div>
       </div>
     );
   }
 
+  if (!analytics) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="text-center">
+          <p>No analytics data available</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Map backend response to frontend expected format
   const {
-    totalPL,
-    realizedPL,
-    unrealizedPL,
-    plOverTime,
-    winRate,
-    totalTrades,
-    avgReturn,
-    bestMarkets,
-    worstMarkets,
-    diversificationScore,
-    sharpeRatio,
-    activePositions,
+    totalPnl = 0,
+    totalInvested = 0,
+    currentValue = 0,
+    pnlPercentage = 0,
+    activePositions = 0,
+    positions = [],
   } = analytics;
+
+  // Use backend data or provide defaults for missing fields
+  const totalPL = totalPnl;
+  const realizedPL = 0; // Backend doesn't provide this yet
+  const unrealizedPL = totalPnl; // All PnL is unrealized for now
+  const plOverTime = []; // Backend doesn't provide time series yet
+  const winRate = 0;
+  const totalTrades = 0;
+  const avgReturn = pnlPercentage;
+  const bestMarkets = [];
+  const worstMarkets = [];
+  const diversificationScore = 0;
+  const sharpeRatio = 0;
 
   const isPositive = totalPL >= 0;
 

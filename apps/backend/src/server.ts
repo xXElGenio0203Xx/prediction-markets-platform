@@ -6,7 +6,7 @@ import fastifyJwt from '@fastify/jwt';
 import { Server as SocketIOServer } from 'socket.io';
 import { createServer } from 'http';
 import { config } from './config.js';
-import { redis, CHANNELS } from './lib/redis.js';
+import { redis, subscriber, CHANNELS } from './lib/redis.js';
 import { limiter, wsLimiter } from './lib/rate-limit.js';
 import { prisma } from './lib/prisma.js';
 import { initSentry } from './lib/sentry.js';
@@ -146,11 +146,17 @@ const registerRoutes = async () => {
   const marketsRoutes = await import('./routes/markets.js');
   const ordersRoutes = await import('./routes/orders.js');
   const userRoutes = await import('./routes/user.js');
+  const adminRoutes = await import('./routes/admin.js');
+  const analyticsRoutes = await import('./routes/analytics.js');
+  const marketRequestsRoutes = await import('./routes/marketRequests.js');
 
   await app.register(authRoutes.default, { prefix: '/api/auth' });
   await app.register(marketsRoutes.default, { prefix: '/api/markets' });
   await app.register(ordersRoutes.default, { prefix: '/api/orders' });
   await app.register(userRoutes.default, { prefix: '/api/user' });
+  await app.register(adminRoutes.default, { prefix: '/api/admin' });
+  await app.register(analyticsRoutes.default, { prefix: '/api/analytics' });
+  await app.register(marketRequestsRoutes.default, { prefix: '/api/market-requests' });
 };
 
 await registerRoutes();
@@ -159,7 +165,7 @@ await registerRoutes();
 // Socket.IO Server
 // ============================================================================
 
-const httpServer = createServer(app.server);
+const httpServer = app.server;
 
 const io = new SocketIOServer(httpServer, {
   cors: {
@@ -252,9 +258,6 @@ io.on('connection', (socket) => {
 });
 
 // Redis pub/sub → Socket.IO bridge
-const subscriber = redis.duplicate();
-await subscriber.connect();
-
 subscriber.subscribe(CHANNELS.ORDERBOOK, (message) => {
   try {
     const data = JSON.parse(message);

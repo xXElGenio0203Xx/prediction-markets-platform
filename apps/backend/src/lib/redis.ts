@@ -5,6 +5,7 @@ export const CHANNELS = {
   ORDERBOOK: 'pm:orderbook',
   TRADES: 'pm:trades',
   MARKETS: 'pm:markets',
+  ORDERS: 'pm:orders',
 } as const;
 
 // Main Redis client for caching, pub/sub, etc.

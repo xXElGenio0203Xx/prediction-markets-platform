@@ -36,7 +36,8 @@ export const getLeaderboard = async () => {
 };
 
 export const ensureUserBonus = async (userId) => {
-  console.warn('ensureUserBonus not implemented yet');
+  // Bonus initialization is handled by backend on first login
+  // This function is kept for compatibility but doesn't need to do anything
   return { success: true };
 };
 

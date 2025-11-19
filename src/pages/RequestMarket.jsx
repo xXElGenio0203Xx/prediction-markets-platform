@@ -1,6 +1,6 @@
-
 import React, { useState } from "react";
 import { useAuth } from "@/api/hooks";
+import { api } from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,16 +37,24 @@ export default function RequestMarketPage({ user }) {
     setSuccess(false);
 
     try {
-      if (!formData.title || !formData.resolution_criteria) {
-          setError("Market Question and Resolution Criteria are required.");
+      // Validation
+      if (!formData.title || formData.title.length < 10) {
+          setError("Market Question must be at least 10 characters.");
+          setIsSubmitting(false);
+          return;
+      }
+      if (!formData.resolution_criteria || formData.resolution_criteria.length < 20) {
+          setError("Resolution Criteria must be at least 20 characters.");
           setIsSubmitting(false);
           return;
       }
         
-      await MarketRequest.create({
-        ...formData,
-        requester_email: user?.email || "anonymous",
-        status: "pending"
+      // Submit market request to backend
+      await api.submitMarketRequest({
+        title: formData.title,
+        description: formData.description,
+        category: formData.category || 'OTHER',
+        resolutionCriteria: formData.resolution_criteria,
       });
       
       setSuccess(true);
@@ -59,7 +67,7 @@ export default function RequestMarketPage({ user }) {
 
     } catch (err) {
       console.error("Error submitting market request:", err);
-      setError("An unexpected error occurred. Please try again.");
+      setError(err.message || "An unexpected error occurred. Please try again.");
     }
     setIsSubmitting(false);
   };
@@ -100,7 +108,7 @@ export default function RequestMarketPage({ user }) {
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="title">Market Question</Label>
+                  <Label htmlFor="title">Market Question * <span className="text-sm text-muted-foreground">(min 10 characters)</span></Label>
                   <Input
                     id="title"
                     value={formData.title}
@@ -109,6 +117,7 @@ export default function RequestMarketPage({ user }) {
                     required
                     className="border-amber-200 focus:border-amber-400"
                   />
+                  <p className="text-xs text-muted-foreground">{formData.title.length} / 10 characters</p>
                 </div>
 
                 <div className="space-y-2">
@@ -124,7 +133,7 @@ export default function RequestMarketPage({ user }) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="criteria">Resolution Criteria</Label>
+                  <Label htmlFor="criteria">Resolution Criteria * <span className="text-sm text-muted-foreground">(min 20 characters)</span></Label>
                   <Textarea
                     id="criteria"
                     value={formData.resolution_criteria}
@@ -134,6 +143,7 @@ export default function RequestMarketPage({ user }) {
                     required
                     className="border-amber-200 focus:border-amber-400"
                   />
+                  <p className="text-xs text-muted-foreground">{formData.resolution_criteria.length} / 20 characters</p>
                 </div>
                 
                 <div className="space-y-2">

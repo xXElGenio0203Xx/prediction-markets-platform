@@ -1,0 +1,203 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderSide {
+  BUY
+  SELL
+}
+
+enum OrderType {
+  LIMIT
+  MARKET
+}
+
+enum OrderStatus {
+  OPEN
+  PARTIALLY_FILLED
+  FILLED
+  CANCELED
+}
+
+enum MarketStatus {
+  DRAFT
+  OPEN
+  RESOLVED
+  CANCELED
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  role         UserRole  @default(USER)
+  fullName     String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  sessions     Session[]
+  orders       Order[]
+  balance      Balance?
+  positions    Position[]
+  transfers    Transfer[]
+  createdMarkets Market[] @relation("MarketCreator")
+
+  @@index([email])
+}
+
+model Session {
+  id               String   @id @default(uuid())
+  userId           String
+  refreshTokenHash String
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Market {
+  id             String       @id @default(uuid())
+  slug           String       @unique
+  question       String
+  description    String?
+  status         MarketStatus @default(DRAFT)
+  resolutionText String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  creatorId      String
+
+  creator   User       @relation("MarketCreator", fields: [creatorId], references: [id])
+  orders    Order[]
+  trades    Trade[]
+  positions Position[]
+  candles   Candle[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([creatorId])
+}
+
+model Order {
+  id         String      @id @default(uuid())
+  userId     String
+  marketId   String
+  side       OrderSide
+  type       OrderType
+  price      Decimal?    @db.Decimal(18, 4)
+  qty        Decimal     @db.Decimal(18, 4)
+  qtyFilled  Decimal     @default(0) @db.Decimal(18, 4)
+  status     OrderStatus @default(OPEN)
+  seq        BigInt      @default(autoincrement())
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  market        Market       @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  buyTrades     Trade[]      @relation("BuyOrder")
+  sellTrades    Trade[]      @relation("SellOrder")
+  events        OrderEvent[]
+
+  @@index([marketId, price(sort: Desc), createdAt], map: "Order_marketId_price_desc_createdAt_idx") // For bids
+  @@index([marketId, price(sort: Asc), createdAt], map: "Order_marketId_price_asc_createdAt_idx")  // For asks
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([seq])
+}
+
+model Trade {
+  id          String   @id @default(uuid())
+  buyOrderId  String
+  sellOrderId String
+  marketId    String
+  price       Decimal  @db.Decimal(18, 4)
+  qty         Decimal  @db.Decimal(18, 4)
+  createdAt   DateTime @default(now())
+
+  buyOrder  Order  @relation("BuyOrder", fields: [buyOrderId], references: [id])
+  sellOrder Order  @relation("SellOrder", fields: [sellOrderId], references: [id])
+  market    Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  @@index([marketId, createdAt])
+  @@index([buyOrderId])
+  @@index([sellOrderId])
+}
+
+model OrderEvent {
+  id              String   @id @default(uuid())
+  orderId         String
+  kind            String
+  payload         Json
+  idempotencyKey  String   @unique
+  createdAt       DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+model Balance {
+  userId    String   @id
+  available Decimal  @default(0) @db.Decimal(18, 4)
+  locked    Decimal  @default(0) @db.Decimal(18, 4)
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Transfer {
+  id        String   @id @default(uuid())
+  userId    String
+  amount    Decimal  @db.Decimal(18, 4)
+  reason    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model Position {
+  userId       String
+  marketId     String
+  qtyLong      Decimal @default(0) @db.Decimal(18, 4)
+  qtyShort     Decimal @default(0) @db.Decimal(18, 4)
+  avgPrice     Decimal @default(0) @db.Decimal(18, 4)
+  realizedPnl  Decimal @default(0) @db.Decimal(18, 4)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  market Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  @@id([userId, marketId])
+  @@index([userId])
+  @@index([marketId])
+}
+
+model Candle {
+  marketId  String
+  timeframe String
+  t         DateTime
+  open      Decimal  @db.Decimal(18, 4)
+  high      Decimal  @db.Decimal(18, 4)
+  low       Decimal  @db.Decimal(18, 4)
+  close     Decimal  @db.Decimal(18, 4)
+  volume    Decimal  @db.Decimal(18, 4)
+
+  market Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  @@id([marketId, timeframe, t])
+  @@index([marketId, timeframe, t])
+}
