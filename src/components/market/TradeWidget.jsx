@@ -92,7 +92,7 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
 
   // Check if user can trade
   const canTrade = currentUser && currentUser.email && currentUser.email.toLowerCase().endsWith('@brown.edu') && market?.status !== 'resolved';
-  const userCash = currentUser?.bruno_dollars || 0;
+  const userCash = currentUser?.balance?.available || 0;
   // UPDATED: hasEnoughCash now considers estimated fees
   const hasEnoughCash = userCash >= (parseFloat(cost) + estimatedFee);
   const withinLimit = numQuantity <= remainingCapacity;
