@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { ShoppingCart, AlertCircle, CheckCircle, TrendingUp, TrendingDown, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ShoppingCart, AlertCircle, CheckCircle, TrendingUp, TrendingDown, Info, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Dialog,
@@ -514,22 +515,72 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
           </div>
 
           {/* Probability Slider */}
-          <div className="space-y-3">
-            <Label className="text-sm font-semibold text-[#4E3629]">
-              How likely is {selectedOutcome.toUpperCase()}? <span className="text-[#A97142]">{probability}%</span>
-            </Label>
-            <Slider
-              value={[probability]}
-              onValueChange={(value) => setProbability(value[0])}
-              min={1}
-              max={99}
-              step={1}
-              disabled={!canTrade}
-              className="w-full [&_span]:bg-[#A97142] [&_div[role=slider]]:bg-[#A97142] [&_div[role=slider]]:border-[#A97142]"
-            />
-            <div className="flex justify-between text-xs text-[#4E3629]/50">
-              <span>1% (Unlikely)</span>
-              <span>99% (Very Likely)</span>
+          <div className="space-y-4 bg-gradient-to-br from-[#A97142]/5 to-[#50C878]/5 p-5 rounded-xl border-2 border-[#A97142]/30">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-bold text-[#4E3629] flex items-center gap-2">
+                Set Your Belief
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-4 h-4 text-[#A97142] cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs bg-[#4E3629] text-white p-4 rounded-lg">
+                      <p className="font-semibold mb-2">💡 How This Works:</p>
+                      <p className="text-sm leading-relaxed">
+                        Move the slider to set your <strong>probability belief</strong>. This determines how much you'll pay per contract.
+                        <br/><br/>
+                        <strong>Example:</strong> If you set 70%, you're saying there's a 70% chance of YES happening. You'll pay $0.70 per contract.
+                        <br/><br/>
+                        If YES wins, you get $1.00 back (profit: $0.30). If NO wins, you lose your $0.70.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </Label>
+              <div className="text-3xl font-black text-[#A97142] bg-white px-4 py-2 rounded-lg shadow-md border-2 border-[#A97142]/30">
+                {probability}%
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <p className="text-sm text-[#4E3629]/80 font-medium text-center">
+                👇 <strong>Slide to set</strong> how likely you think <strong>{selectedOutcome.toUpperCase()}</strong> is
+              </p>
+              <div className="bg-white p-4 rounded-lg shadow-inner">
+                <Slider
+                  value={[probability]}
+                  onValueChange={(value) => setProbability(value[0])}
+                  min={1}
+                  max={99}
+                  step={1}
+                  disabled={!canTrade}
+                  className="w-full [&_[role=slider]]:h-6 [&_[role=slider]]:w-6 [&_[role=slider]]:bg-[#A97142] [&_[role=slider]]:border-4 [&_[role=slider]]:border-white [&_[role=slider]]:shadow-lg [&_[role=slider]]:cursor-pointer [&_.bg-primary]:bg-[#A97142] [&_.bg-primary]:h-2"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-between items-center text-xs px-2">
+              <div className="flex flex-col items-start">
+                <span className="font-bold text-[#E34234]">1%</span>
+                <span className="text-[#4E3629]/60">Very Unlikely</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="font-bold text-[#4E3629]">50%</span>
+                <span className="text-[#4E3629]/60">Toss-up</span>
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="font-bold text-[#50C878]">99%</span>
+                <span className="text-[#4E3629]/60">Very Likely</span>
+              </div>
+            </div>
+
+            <div className="bg-[#A97142]/10 p-3 rounded-lg border border-[#A97142]/20">
+              <p className="text-sm text-[#4E3629] font-medium">
+                💵 <strong>Your cost per contract:</strong> ${price.toFixed(2)}
+              </p>
+              <p className="text-xs text-[#4E3629]/70 mt-1">
+                If correct, each contract pays $1.00
+              </p>
             </div>
           </div>
 
