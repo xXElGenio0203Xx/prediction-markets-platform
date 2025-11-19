@@ -206,7 +206,7 @@ export default function AllMarketsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <Link to={createPageUrl(`Market?id=${market.id}`)}>
+                <Link to={createPageUrl(`Market?id=${market.slug}`)}>
                   <Card className="bg-white/80 backdrop-blur-sm border-2 border-[#4E3629]/10 hover:border-[#A97142]/40 shadow-lg hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden">
                     <CardContent className="p-6">
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
