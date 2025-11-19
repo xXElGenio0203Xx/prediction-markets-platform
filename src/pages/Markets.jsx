@@ -54,6 +54,16 @@ export default function MarketsPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Reload markets when user navigates back to this page
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('📊 Markets: Page focused, reloading markets...');
+      loadMarkets();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
   const loadMarkets = async () => {
     setIsLoading(true);
     try {
