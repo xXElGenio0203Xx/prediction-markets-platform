@@ -29,6 +29,10 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     const passwordHash = await hashPassword(password);
 
+    // Check if email is @brown.edu for initial balance
+    const isBrownEmail = email.toLowerCase().endsWith('@brown.edu');
+    const initialBalance = isBrownEmail ? 100 : 100; // All users get $100 for now
+
     const user = await prisma.$transaction(async (tx: any) => {
       const newUser = await tx.user.create({
         data: { 
@@ -42,7 +46,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Create initial balance
       await tx.balance.create({
-        data: { userId: newUser.id, available: 100, locked: 0, total: 100 },
+        data: { userId: newUser.id, available: initialBalance, locked: 0, total: initialBalance },
       });
 
       return newUser;
@@ -79,6 +83,10 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         updatedAt: user.updatedAt,
       },
       accessToken,
+      message: isBrownEmail 
+        ? `Welcome to BrunoExchange! Your account has been credited with $${initialBalance} Bruno Dollars to start trading.`
+        : 'Account created successfully.',
+      initialBalance,
     });
   });
 

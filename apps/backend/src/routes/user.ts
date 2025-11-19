@@ -14,9 +14,9 @@ const userRoutes: FastifyPluginAsync = async (fastify) => {
       balance = await prisma.balance.create({
         data: {
           userId,
-          available: 1000,
+          available: 100,
           locked: 0,
-          total: 1000,
+          total: 100,
         },
       });
     }
