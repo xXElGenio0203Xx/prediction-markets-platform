@@ -6,7 +6,7 @@
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-cd backend
+cd apps/backend
 
 echo "🚀 Starting backend with auto-restart enabled..."
 echo "📍 Press Ctrl+C to stop"
