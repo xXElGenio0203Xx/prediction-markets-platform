@@ -77,12 +77,12 @@ const CarouselCard = ({ market }) => (
 
         <div className="mt-6 pt-4 border-t border-amber-300">
           <div className="flex gap-4">
-            <Link to={createPageUrl(`Market?id=${market.id}`)} className="flex-1">
+            <Link to={createPageUrl(`Market?slug=${market.slug}`)} className="flex-1">
               <Button className="w-full h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold">
                 Buy YES • ${(market.current_price || 0.5).toFixed(2)}
               </Button>
             </Link>
-            <Link to={createPageUrl(`Market?id=${market.id}`)} className="flex-1">
+            <Link to={createPageUrl(`Market?slug=${market.slug}`)} className="flex-1">
               <Button className="w-full h-12 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold">
                 Buy NO • ${(1 - (market.current_price || 0.5)).toFixed(2)}
               </Button>
