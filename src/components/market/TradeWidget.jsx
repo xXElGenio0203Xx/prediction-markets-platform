@@ -480,7 +480,9 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
           )}
 
           {/* Outcome Pills */}
-          <div className="flex gap-3">
+          <div className={`flex gap-3 ${
+            market?.status === 'resolved' ? 'grayscale opacity-50 pointer-events-none' : ''
+          }`}>
             <motion.button
               whileHover={{ scale: canTrade ? 1.02 : 1 }}
               whileTap={{ scale: canTrade ? 0.98 : 1 }}
@@ -636,20 +638,22 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
           )}
 
           {/* Order Buttons */}
-          <div className="flex gap-3 pt-2">
+          <div className={`flex gap-3 pt-2 ${
+            market?.status === 'resolved' ? 'grayscale opacity-50' : ''
+          }`}>
             <Button
               onClick={() => openConfirmDialog('buy')}
-              disabled={isSubmitting || !canTrade || !quantity || numQuantity === 0 || !hasEnoughCash || !withinLimit}
+              disabled={isSubmitting || !canTrade || !quantity || numQuantity === 0 || !hasEnoughCash || !withinLimit || market?.status === 'resolved'}
               className="flex-1 bg-[#50C878] hover:bg-[#3FA963] text-white font-semibold py-6 rounded-xl shadow-lg disabled:bg-gray-300 disabled:shadow-none"
             >
-              BUY {selectedOutcome.toUpperCase()}
+              {market?.status === 'resolved' ? 'MARKET RESOLVED' : `BUY ${selectedOutcome.toUpperCase()}`}
             </Button>
             <Button
               onClick={() => openConfirmDialog('sell')}
-              disabled={isSubmitting || !canTrade || !quantity || numQuantity === 0 || availableShares < numQuantity}
+              disabled={isSubmitting || !canTrade || !quantity || numQuantity === 0 || availableShares < numQuantity || market?.status === 'resolved'}
               className="flex-1 bg-[#E34234] hover:bg-[#C93529] text-white font-semibold py-6 rounded-xl shadow-lg disabled:bg-gray-300 disabled:shadow-none"
             >
-              SELL {selectedOutcome.toUpperCase()}
+              {market?.status === 'resolved' ? 'MARKET RESOLVED' : `SELL ${selectedOutcome.toUpperCase()}`}
             </Button>
           </div>
 

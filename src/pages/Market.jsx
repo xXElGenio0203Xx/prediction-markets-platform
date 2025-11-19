@@ -395,15 +395,17 @@ export default function MarketPage({ user: userProp }) {
           {/* Left Column - Chart & Trade (70% width) */}
           <div className="lg:col-span-3 space-y-6">
             {/* Price Chart */}
-            <Card className="bg-white/80 backdrop-blur-sm border-2 border-[#4E3629]/10 shadow-lg rounded-2xl overflow-hidden">
+            <Card className={`bg-white/80 backdrop-blur-sm border-2 border-[#4E3629]/10 shadow-lg rounded-2xl overflow-hidden ${
+              market.status === 'resolved' ? 'grayscale opacity-75' : ''
+            }`}>
               <CardHeader className="border-b border-[#4E3629]/5">
                 <CardTitle className="text-lg font-semibold text-[#4E3629] flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-[#A97142]" />
-                  Price Chart
+                  Price Chart {market.status === 'resolved' && <span className="text-xs text-gray-500">(Market Resolved)</span>}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
-                <MarketChart priceHistory={mockPriceHistory} />
+                <MarketChart priceHistory={mockPriceHistory} isResolved={market.status === 'resolved'} />
               </CardContent>
             </Card>
 
