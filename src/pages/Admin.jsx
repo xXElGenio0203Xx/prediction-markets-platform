@@ -138,8 +138,23 @@ export default function AdminPage() {
 
   const loadEconomyValidation = async () => {
     try {
-      // This function is deprecated, set default validation state
-      setEconomyValidation({ valid: true, message: 'Economy validation moved to backend' });
+      // This function is deprecated, set default validation state with expected structure
+      setEconomyValidation({ 
+        validation: { 
+          is_balanced: true,
+          difference: 0 
+        },
+        breakdown: {
+          total_initial: 0,
+          total_user_balances: 0,
+          total_in_orders: 0,
+          total_in_positions: 0
+        },
+        users: {
+          verified: 0,
+          total: 0
+        }
+      });
     } catch (error) {
       console.error("Error loading economy validation:", error);
       setEconomyValidation(null);
@@ -613,15 +628,15 @@ export default function AdminPage() {
             <CardContent className="space-y-4">
               {/* Status Badge */}
               <div className="flex items-center gap-3">
-                <Badge className={economyValidation.validation.is_balanced ?
+                <Badge className={economyValidation?.validation?.is_balanced ?
                   "bg-green-600 text-white text-lg px-6 py-2" :
                   "bg-red-600 text-white text-lg px-6 py-2"
                 }>
-                  {economyValidation.validation.is_balanced ? '✅ SYSTEM BALANCED' : '⚠️ IMBALANCE DETECTED'}
+                  {economyValidation?.validation?.is_balanced ? '✅ SYSTEM BALANCED' : '⚠️ IMBALANCE DETECTED'}
                 </Badge>
-                {!economyValidation.validation.is_balanced && (
+                {!economyValidation?.validation?.is_balanced && (
                   <span className="text-red-400 font-semibold">
-                    Difference: ${Math.abs(economyValidation.validation.difference).toFixed(2)}
+                    Difference: ${Math.abs(economyValidation?.validation?.difference || 0).toFixed(2)}
                   </span>
                 )}
               </div>
@@ -631,34 +646,34 @@ export default function AdminPage() {
                 <div className="bg-[#2A1F1A]/50 p-4 rounded-lg">
                   <p className="text-[#FAF3E0]/60 text-xs mb-1">Expected Total</p>
                   <p className="text-2xl font-bold text-[#FAF3E0]">
-                    ${economyValidation.breakdown.total_initial.toFixed(2)}
+                    ${(economyValidation?.breakdown?.total_initial || 0).toFixed(2)}
                   </p>
                   <p className="text-xs text-[#FAF3E0]/40 mt-1">
-                    {economyValidation.users.verified} verified users × $100
+                    {economyValidation?.users?.verified || 0} verified users × $100
                   </p>
                 </div>
 
                 <div className="bg-[#2A1F1A]/50 p-4 rounded-lg">
                   <p className="text-[#FAF3E0]/60 text-xs mb-1">Cash in Circulation</p>
                   <p className="text-2xl font-bold text-[#CD853F]">
-                    ${economyValidation.breakdown.total_cash.toFixed(2)}
+                    ${(economyValidation?.breakdown?.total_cash || economyValidation?.breakdown?.total_user_balances || 0).toFixed(2)}
                   </p>
                 </div>
 
                 <div className="bg-[#2A1F1A]/50 p-4 rounded-lg">
                   <p className="text-[#FAF3E0]/60 text-xs mb-1">Locked in Positions</p>
                   <p className="text-2xl font-bold text-[#A97142]">
-                    ${economyValidation.breakdown.total_locked.toFixed(2)}
+                    ${(economyValidation?.breakdown?.total_locked || economyValidation?.breakdown?.total_in_positions || 0).toFixed(2)}
                   </p>
                   <p className="text-xs text-[#FAF3E0]/40 mt-1">
-                    {economyValidation.positions.active} active positions
+                    {economyValidation?.positions?.active || 0} active positions
                   </p>
                 </div>
 
                 <div className="bg-[#2A1F1A]/50 p-4 rounded-lg">
                   <p className="text-[#FAF3E0]/60 text-xs mb-1">Actual Total</p>
-                  <p className={`text-2xl font-bold ${economyValidation.validation.is_balanced ? 'text-green-400' : 'text-red-400'}`}>
-                    ${economyValidation.breakdown.total_actual.toFixed(2)}
+                  <p className={`text-2xl font-bold ${economyValidation?.validation?.is_balanced ? 'text-green-400' : 'text-red-400'}`}>
+                    ${(economyValidation?.breakdown?.total_actual || 0).toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -666,11 +681,11 @@ export default function AdminPage() {
               {/* Validation Formula */}
               <div className="bg-[#4E3629]/30 p-4 rounded-lg border border-[#A97142]/30">
                 <p className="text-[#FAF3E0] font-mono text-sm">
-                  totalInitial ({economyValidation.breakdown.total_initial.toFixed(2)}) =
-                  totalCash ({economyValidation.breakdown.total_cash.toFixed(2)}) +
-                  totalLocked ({economyValidation.breakdown.total_locked.toFixed(2)}) =
-                  <span className={economyValidation.validation.is_balanced ? 'text-green-400' : 'text-red-400'}>
-                    {' '}{economyValidation.breakdown.total_actual.toFixed(2)}
+                  totalInitial ({(economyValidation?.breakdown?.total_initial || 0).toFixed(2)}) =
+                  totalCash ({(economyValidation?.breakdown?.total_cash || economyValidation?.breakdown?.total_user_balances || 0).toFixed(2)}) +
+                  totalLocked ({(economyValidation?.breakdown?.total_locked || economyValidation?.breakdown?.total_in_positions || 0).toFixed(2)}) =
+                  <span className={economyValidation?.validation?.is_balanced ? 'text-green-400' : 'text-red-400'}>
+                    {' '}{(economyValidation?.breakdown?.total_actual || 0).toFixed(2)}
                   </span>
                 </p>
               </div>
