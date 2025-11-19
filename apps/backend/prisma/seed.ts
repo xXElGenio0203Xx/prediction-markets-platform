@@ -117,9 +117,9 @@ async function main() {
     },
     {
       slug: 'us-recession-2025',
-      question: 'Will the US enter recession in 2025?',
+      question: 'Will the median score of Principles of Econ Midterm II be above 65?',
       description:
-        'This market resolves to YES if the National Bureau of Economic Research (NBER) officially declares that the US economy entered a recession at any point during calendar year 2025. Resolution based on NBER announcement, regardless of timing.',
+        'This market resolves to YES if the median score on the Principles of Economics Midterm II exam is above 65 points. Resolution will be based on official grade distribution released by the course instructor.',
       category: 'ECONOMICS',
       closeTime: new Date('2025-12-31T23:59:59Z'),
       resolveTime: new Date('2026-06-30T12:00:00Z'),
