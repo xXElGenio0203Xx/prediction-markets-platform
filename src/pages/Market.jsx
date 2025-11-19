@@ -391,31 +391,28 @@ export default function MarketPage({ user: userProp }) {
         )}
 
         {/* Main Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Chart & Order Book (2 columns) */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Price Chart & Order Book Side by Side */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Price Chart - Half Width */}
-              <Card className={`bg-white/80 backdrop-blur-sm border-2 border-[#4E3629]/10 shadow-lg rounded-2xl overflow-hidden ${
-                market.status === 'resolved' ? 'grayscale opacity-75' : ''
-              }`}>
-                <CardHeader className="border-b border-[#4E3629]/5 py-3">
-                  <CardTitle className="text-base font-semibold text-[#4E3629] flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-[#A97142]" />
-                    Price Chart {market.status === 'resolved' && <span className="text-xs text-gray-500">(Resolved)</span>}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <MarketChart priceHistory={mockPriceHistory} isResolved={market.status === 'resolved'} />
-                </CardContent>
-              </Card>
+        <div className="space-y-6">
+          {/* Top Row - Chart, Order Book, and Trade Widget */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Price Chart - 1/3 Width */}
+            <Card className={`bg-white/80 backdrop-blur-sm border-2 border-[#4E3629]/10 shadow-lg rounded-2xl overflow-hidden ${
+              market.status === 'resolved' ? 'grayscale opacity-75' : ''
+            }`}>
+              <CardHeader className="border-b border-[#4E3629]/5 py-3">
+                <CardTitle className="text-base font-semibold text-[#4E3629] flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-[#A97142]" />
+                  Price Chart {market.status === 'resolved' && <span className="text-xs text-gray-500">(Resolved)</span>}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <MarketChart priceHistory={mockPriceHistory} isResolved={market.status === 'resolved'} />
+              </CardContent>
+            </Card>
 
-              {/* Order Book - Half Width */}
-              <OrderBook orders={orders} selectedOutcome={selectedOutcome} />
-            </div>
+            {/* Order Book - 1/3 Width */}
+            <OrderBook orders={orders} selectedOutcome={selectedOutcome} />
 
-            {/* Trade Widget */}
+            {/* Trade Widget - 1/3 Width */}
             <TradeWidget
               market={market}
               user={user}
@@ -423,15 +420,20 @@ export default function MarketPage({ user: userProp }) {
               selectedOutcome={selectedOutcome}
               onOutcomeChange={setSelectedOutcome}
             />
-
-            {/* Market Details - Collapsible */}
-            <MarketDetails market={market} />
           </div>
 
-          {/* Right Column - Sidebar (1 column) */}
-          <div className="space-y-6">
-            <MarketSidebar market={market} user={user} orders={orders} />
-            <UserPositions userOrders={userOrders} />
+          {/* Bottom Row - Details and Sidebar */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Market Details - 2/3 Width */}
+            <div className="lg:col-span-2">
+              <MarketDetails market={market} />
+            </div>
+
+            {/* Sidebar and Positions - 1/3 Width */}
+            <div className="space-y-6">
+              <MarketSidebar market={market} user={user} orders={orders} />
+              <UserPositions userOrders={userOrders} />
+            </div>
           </div>
         </div>
       </div>
