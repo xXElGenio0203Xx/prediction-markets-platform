@@ -84,8 +84,8 @@ export default function Layout({ children, currentPageName }) {
           setUser(updatedUser);
           
           // Get balance
-          const balance = await api.getBalance();
-          setBrunoDollars(balance.available || 0);
+          const balanceResponse = await api.getBalance();
+          setBrunoDollars(balanceResponse.balance?.available || 0);
           
           // Fetch positions
           const positionsData = await api.getPositions();
