@@ -7,8 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ShoppingCart, AlertCircle, CheckCircle, TrendingUp, TrendingDown, Info, HelpCircle, ChevronDown } from 'lucide-react';
+import { ShoppingCart, AlertCircle, CheckCircle, TrendingUp, TrendingDown, Info, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Dialog,
@@ -22,14 +21,13 @@ import { api } from "@/api/client";
 
 export default function TradeWidget({ market, user, onOrderPlaced, selectedOutcome, onOutcomeChange }) {
   const [probability, setProbability] = useState(50); // Represents price as a percentage
-  const [betAmount, setBetAmount] = useState(''); // Dollar amount instead of quantity
+  const [quantity, setQuantity] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastOrderStatus, setLastOrderStatus] = useState(null);
   const [currentUser, setCurrentUser] = useState(user);
   const [userPositions, setUserPositions] = useState([]);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, side: null });
   const [feeCfg, setFeeCfg] = useState({ maker_bps: 0, taker_bps: 0, per_contract_fee: 0 }); // ADDED: fee config state
-  const [showDetails, setShowDetails] = useState(false); // For collapsible section
 
   // Fetch fresh user on mount and whenever an order is placed to refresh Bruno Dollars
   useEffect(() => {
@@ -77,12 +75,11 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
   const remainingCapacity = Math.max(0, 100 - totalContracts); // Max 100 contracts per market
 
   // Calculate values for display and order placement
+  const numQuantity = parseInt(quantity) || 0;
   const price = probability / 100; // Price derived from probability
-  const numBetAmount = parseFloat(betAmount) || 0; // Dollar amount user wants to bet
-  const numQuantity = Math.floor(numBetAmount / price) || 0; // Calculate contracts from dollar amount
-  const actualCost = (price * numQuantity).toFixed(2); // Actual cost based on rounded contracts
+  const cost = (price * numQuantity).toFixed(2);
   const potentialPayout = numQuantity.toFixed(2); // Payout is always 1 per contract if correct
-  const expectedProfit = (parseFloat(potentialPayout) - parseFloat(actualCost)).toFixed(2);
+  const expectedProfit = (parseFloat(potentialPayout) - parseFloat(cost)).toFixed(2);
 
   // Helper to estimate taker fee shown to user
   const estimatedFee = (() => {
@@ -98,7 +95,7 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
   const canTrade = currentUser && currentUser.email && currentUser.email.toLowerCase().endsWith('@brown.edu') && market?.status !== 'resolved';
   const userCash = currentUser?.balance?.available || 0;
   // UPDATED: hasEnoughCash now considers estimated fees
-  const hasEnoughCash = userCash >= (parseFloat(actualCost) + estimatedFee);
+  const hasEnoughCash = userCash >= (parseFloat(cost) + estimatedFee);
   const withinLimit = numQuantity <= remainingCapacity;
 
   // Get available shares for selling the selected outcome
@@ -295,24 +292,24 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
       return;
     }
 
-    if (!betAmount || numBetAmount === 0 || numQuantity === 0) {
-      setLastOrderStatus({ type: 'error', message: 'Please enter a bet amount.' });
+    if (!quantity || numQuantity === 0) {
+      setLastOrderStatus({ type: 'error', message: 'Please enter a quantity.' });
       return;
     }
 
     if (numQuantity < 1 || numQuantity > 100) {
-      setLastOrderStatus({ type: 'error', message: 'Your bet amount results in too many or too few contracts (min 1, max 100).' });
+      setLastOrderStatus({ type: 'error', message: 'Quantity must be between 1 and 100.' });
       return;
     }
 
     // UPDATED: hasEnoughCash already includes fees
     if (side === 'buy' && (!hasEnoughCash || !withinLimit)) {
-        setLastOrderStatus({ type: 'error', message: 'Cannot place your bet: Not enough money or too many contracts.' });
+        setLastOrderStatus({ type: 'error', message: 'Cannot place buy order: Insufficient funds or exceeding contract limit.' });
         return;
     }
 
     if (side === 'sell' && availableShares < numQuantity) {
-        setLastOrderStatus({ type: 'error', message: `Cannot sell: You only have ${availableShares} ${selectedOutcome.toUpperCase()} contracts to sell.` });
+        setLastOrderStatus({ type: 'error', message: `Cannot place sell order: You only have ${availableShares} ${selectedOutcome.toUpperCase()} contracts to sell.` });
         return;
     }
 
@@ -521,7 +518,7 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
           <div className="space-y-4 bg-gradient-to-br from-[#A97142]/5 to-[#50C878]/5 p-5 rounded-xl border-2 border-[#A97142]/30">
             <div className="flex items-center justify-between">
               <Label className="text-xl font-bold text-[#4E3629] flex items-center gap-2">
-                How likely do you think {selectedOutcome.toUpperCase()} will happen?
+                Set Your Belief
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -530,11 +527,11 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
                     <TooltipContent className="max-w-xs bg-[#4E3629] text-white p-4 rounded-lg">
                       <p className="font-semibold mb-2">💡 How This Works:</p>
                       <p className="text-sm leading-relaxed">
-                        Slide to show your confidence level. This determines how much you pay.
+                        Move the slider to set your <strong>probability belief</strong>. This determines how much you'll pay per contract.
                         <br/><br/>
-                        <strong>Example:</strong> If you set 70%, you're saying there's a 70% chance of {selectedOutcome.toUpperCase()}. You'll pay $0.70 per contract.
+                        <strong>Example:</strong> If you set 70%, you're saying there's a 70% chance of YES happening. You'll pay $0.70 per contract.
                         <br/><br/>
-                        If {selectedOutcome.toUpperCase()} wins, you get $1.00 back (profit: $0.30). If wrong, you lose your $0.70.
+                        If YES wins, you get $1.00 back (profit: $0.30). If NO wins, you lose your $0.70.
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -546,6 +543,9 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
             </div>
             
             <div className="space-y-3">
+              <p className="text-base text-[#4E3629] font-bold text-center">
+                👇 <strong>Slide to set</strong> how likely you think <strong>{selectedOutcome.toUpperCase()}</strong> is
+              </p>
               <div className="bg-white p-5 rounded-lg shadow-inner">
                 <Slider
                   value={[probability]}
@@ -590,122 +590,70 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
             </div>
           </div>
 
-          {/* Bet Amount Input */}
+          {/* Quantity Input */}
           <div className="space-y-2">
-            <Label htmlFor="betAmount" className="text-xl font-bold text-[#4E3629]">
-              How much do you want to bet?
+            <Label htmlFor="quantity" className="text-sm font-semibold text-[#4E3629]">
+              Quantity (Contracts)
             </Label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-[#A97142]">$</span>
-              <Input
-                id="betAmount"
-                type="number"
-                min="0"
-                step="0.01"
-                value={betAmount}
-                onChange={(e) => setBetAmount(e.target.value)}
-                placeholder="10.00"
-                disabled={!canTrade}
-                className="border-[#4E3629]/20 focus-visible:ring-offset-0 focus-visible:ring-2 focus-visible:ring-[#A97142] focus:border-[#A97142] text-2xl font-bold px-12 py-6 rounded-lg pl-10"
-              />
-            </div>
-            <p className="text-sm text-[#4E3629]/60">
-              You have ${userCash.toFixed(2)} available
+            <Input
+              id="quantity"
+              type="number"
+              min="1"
+              max={remainingCapacity}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              placeholder={`Max: ${remainingCapacity}`}
+              disabled={!canTrade}
+              className="border-[#4E3629]/20 focus-visible:ring-offset-0 focus-visible:ring-2 focus-visible:ring-[#A97142] focus:border-[#A97142] text-lg px-4 py-3 rounded-lg"
+            />
+            <p className="text-xs text-[#4E3629]/60">
+              Enter 1-{remainingCapacity} contracts (you hold {totalContracts}/100 in this market)
             </p>
           </div>
 
-          {/* Potential Payout - PROMINENT DISPLAY */}
-          {betAmount && numBetAmount > 0 && numQuantity > 0 ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-gradient-to-r from-[#50C878]/20 to-[#50C878]/10 p-6 rounded-2xl border-3 border-[#50C878] shadow-lg"
-            >
-              <p className="text-sm text-[#4E3629]/70 mb-2 text-center">If {selectedOutcome.toUpperCase()} wins, you'll get:</p>
-              <motion.div
-                key={potentialPayout}
-                initial={{ scale: 1.2 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 200 }}
-                className="text-center"
-              >
-                <span className="text-5xl font-black text-[#50C878]">
-                  ${potentialPayout}
-                </span>
-              </motion.div>
-              <motion.p
-                key={expectedProfit}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-center mt-3 text-lg"
-              >
-                <span className="text-[#4E3629]/70">Profit: </span>
-                <span className={`font-black text-2xl ${parseFloat(expectedProfit) >= 0 ? 'text-[#50C878]' : 'text-[#E34234]'}`}>
-                  {parseFloat(expectedProfit) >= 0 ? '+' : ''}${expectedProfit}
-                </span>
-              </motion.p>
-            </motion.div>
-          ) : (
-            <div className="text-center py-8 bg-[#A97142]/5 rounded-xl border-2 border-dashed border-[#A97142]/30">
-              <motion.div
-                animate={{ opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                <p className="text-lg font-medium text-[#4E3629]/60">👆 Enter an amount to see your potential payout</p>
-              </motion.div>
-            </div>
-          )}
-
-          {/* Collapsible Details Section */}
-          <Collapsible open={showDetails} onOpenChange={setShowDetails}>
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full flex items-center justify-center gap-2 text-[#A97142] hover:text-[#4E3629] hover:bg-[#A97142]/10"
-              >
-                <ChevronDown className={`w-5 h-5 transition-transform ${showDetails ? 'rotate-180' : ''}`} />
-                <span className="font-semibold">
-                  {showDetails ? 'Hide' : 'Show'} calculation details
-                </span>
-              </Button>
-            </CollapsibleTrigger>
-            
-            <CollapsibleContent className="space-y-4 pt-4">
-              {betAmount && numBetAmount > 0 && numQuantity > 0 ? (
-                <>
-                  {/* Detailed Breakdown */}
-                  <div className="bg-gradient-to-r from-[#A97142]/10 to-[#50C878]/10 p-5 rounded-xl border-2 border-[#A97142]/30">
-                    <h4 className="font-bold text-[#4E3629] mb-3 flex items-center gap-2">
-                      <Info className="w-4 h-4" />
-                      How We Calculate Your Trade
-                    </h4>
-                    <div className="space-y-2 text-sm">
+          {/* Live Projection Box - ALWAYS VISIBLE */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="bg-gradient-to-r from-[#A97142]/10 to-[#50C878]/10 p-5 rounded-xl border-2 border-[#A97142]/30"
+          >
+            <h4 className="font-bold text-[#4E3629] mb-3 flex items-center gap-2">
+              <Info className="w-4 h-4" />
+              Prediction Summary
+            </h4>
+            {currentUser ? (
+              <>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[#4E3629]/60">Your Cash</span>
+                    <motion.span 
+                      key={userCash}
+                      initial={{ scale: 1 }}
+                      animate={{ scale: [1, 1.1, 1] }}
+                      transition={{ duration: 0.3 }}
+                      className="font-semibold text-[#4E3629]"
+                    >
+                      ${userCash.toFixed(2)}
+                    </motion.span>
+                  </div>
+                  {quantity && numQuantity > 0 ? (
+                    <>
                       <div className="flex justify-between items-center">
-                        <span className="text-[#4E3629]/60">Your confidence level</span>
-                        <span className="font-semibold text-[#4E3629]">{probability}%</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-[#4E3629]/60">Price per contract</span>
-                        <span className="font-semibold text-[#4E3629]">${price.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-[#4E3629]/60">Number of contracts</span>
-                        <span className="font-semibold text-[#4E3629]">{numQuantity}</span>
-                      </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-[#A97142]/20">
-                        <span className="text-[#4E3629]/60">Contract cost</span>
+                        <span className="text-[#4E3629]/60">Cost</span>
                         <motion.span 
-                          key={actualCost}
+                          key={cost}
                           initial={{ scale: 1.2, color: '#A97142' }}
                           animate={{ scale: 1, color: '#4E3629' }}
                           transition={{ duration: 0.3 }}
                           className="font-bold text-lg"
                         >
-                          ${actualCost}
+                          ${cost}
                         </motion.span>
                       </div>
+                      {/* ADDED: Estimated Fees and You Pay Now */}
                       <div className="flex justify-between items-center">
-                        <span className="text-[#4E3629]/60">Trading fees</span>
+                        <span className="text-[#4E3629]/60">Estimated Fees (taker)</span>
                         <motion.span 
                           key={estimatedFee}
                           initial={{ scale: 1.1 }}
@@ -716,85 +664,110 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
                           ${estimatedFee.toFixed(2)}
                         </motion.span>
                       </div>
-                      <div className="flex justify-between items-center pt-2 border-t-2 border-[#A97142]/30 bg-gradient-to-r from-[#A97142]/5 to-transparent p-3 rounded-lg">
-                        <span className="text-[#4E3629] font-bold">Total you'll pay now</span>
+                      <div className="flex justify-between items-center pt-2 border-t-2 border-[#A97142]/20">
+                        <span className="text-[#4E3629]/60 font-bold">You Pay Now</span>
                         <motion.span 
-                          key={parseFloat(actualCost) + estimatedFee}
+                          key={parseFloat(cost) + estimatedFee}
                           initial={{ scale: 1.3, color: '#A97142' }}
                           animate={{ scale: 1, color: '#4E3629' }}
                           transition={{ duration: 0.3 }}
                           className="font-bold text-xl"
                         >
-                          ${(parseFloat(actualCost) + estimatedFee).toFixed(2)}
+                          ${(parseFloat(cost) + estimatedFee).toFixed(2)}
                         </motion.span>
                       </div>
+                      {/* END ADDED */}
+                      <div className="flex justify-between items-center pt-2">
+                        <span className="text-[#4E3629]/60">Potential Payout (if correct)</span>
+                        <motion.span 
+                          key={potentialPayout}
+                          initial={{ scale: 1.2, color: '#50C878' }}
+                          animate={{ scale: 1 }}
+                          transition={{ duration: 0.3 }}
+                          className="font-bold text-[#50C878] text-lg"
+                        >
+                          ${potentialPayout}
+                        </motion.span>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t-2 border-[#A97142]/20 bg-gradient-to-r from-[#50C878]/5 to-transparent p-3 rounded-lg -mx-1">
+                        <span className="text-[#4E3629] font-bold">Expected Profit</span>
+                        <motion.span 
+                          key={expectedProfit}
+                          initial={{ scale: 1.4 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: "spring", stiffness: 200, damping: 10 }}
+                          className={`font-black text-2xl ${parseFloat(expectedProfit) >= 0 ? 'text-[#50C878]' : 'text-[#E34234]'}`}
+                        >
+                          {parseFloat(expectedProfit) >= 0 ? '+' : ''}${expectedProfit}
+                        </motion.span>
+                      </div>
+
+                      {/* If/Else Outcomes */}
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
+                        className="mt-4 pt-4 border-t-2 border-[#A97142]/20 space-y-2"
+                      >
+                        <div className="flex items-center gap-2 text-sm bg-[#50C878]/10 p-2 rounded-lg">
+                          <CheckCircle className="w-4 h-4 text-[#50C878]" />
+                          <span className="text-[#50C878] font-semibold">
+                            If {selectedOutcome.toUpperCase()} wins: You gain <span className="text-base font-black">${expectedProfit}</span>
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm bg-[#E34234]/10 p-2 rounded-lg">
+                          <AlertCircle className="w-4 h-4 text-[#E34234]" />
+                          <span className="text-[#E34234] font-semibold">
+                            If {selectedOutcome.toUpperCase()} loses: You lose <span className="text-base font-black">${cost}</span>
+                          </span>
+                        </div>
+                      </motion.div>
+
+                      {/* Warnings */}
+                      {!hasEnoughCash && (
+                        <motion.div 
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="mt-3 p-3 bg-[#E34234]/10 border border-[#E34234]/30 rounded-lg flex items-center gap-2"
+                        >
+                          <AlertCircle className="w-4 h-4 text-[#E34234]" />
+                          <p className="text-xs text-[#E34234] font-medium">
+                            ⚠️ You don't have enough Bruno Dollars to place this trade (including estimated fees).
+                          </p>
+                        </motion.div>
+                      )}
+
+                      {!withinLimit && (
+                        <motion.div 
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="mt-3 p-3 bg-[#E34234]/10 border border-[#E34234]/30 rounded-lg flex items-center gap-2"
+                        >
+                          <AlertCircle className="w-4 h-4 text-[#E34234]" />
+                          <p className="text-xs text-[#E34234] font-medium">
+                            ⚠️ Exceeds your remaining capacity of {remainingCapacity} contracts in this market.
+                          </p>
+                        </motion.div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-8 text-[#4E3629]/60">
+                      <motion.div
+                        animate={{ opacity: [0.5, 1, 0.5] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        <p className="text-base font-medium">👆 Enter a quantity above to see your prediction details</p>
+                      </motion.div>
                     </div>
-                  </div>
-
-                  {/* If/Else Outcomes */}
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="space-y-2"
-                  >
-                    <div className="flex items-center gap-2 text-sm bg-[#50C878]/10 p-3 rounded-lg">
-                      <CheckCircle className="w-5 h-5 text-[#50C878]" />
-                      <span className="text-[#50C878] font-semibold">
-                        If {selectedOutcome.toUpperCase()} wins: You gain <span className="text-base font-black">${expectedProfit}</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm bg-[#E34234]/10 p-3 rounded-lg">
-                      <AlertCircle className="w-5 h-5 text-[#E34234]" />
-                      <span className="text-[#E34234] font-semibold">
-                        If {selectedOutcome.toUpperCase()} loses: You lose <span className="text-base font-black">${actualCost}</span>
-                      </span>
-                    </div>
-                  </motion.div>
-
-                  {/* Position Limit Info */}
-                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                    <p className="text-xs text-blue-900">
-                      📊 You currently hold {totalContracts} contracts in this market. Maximum allowed: 100 contracts.
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <p className="text-center text-sm text-[#4E3629]/60 py-4">Enter a bet amount to see calculation details</p>
-              )}
-            </CollapsibleContent>
-          </Collapsible>
-
-          {/* Warnings */}
-          {betAmount && numBetAmount > 0 && (
-            <>
-              {!hasEnoughCash && (
-                <motion.div 
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="p-3 bg-[#E34234]/10 border border-[#E34234]/30 rounded-lg flex items-center gap-2"
-                >
-                  <AlertCircle className="w-4 h-4 text-[#E34234]" />
-                  <p className="text-sm text-[#E34234] font-medium">
-                    ⚠️ You don't have enough money for this bet (including fees).
-                  </p>
-                </motion.div>
-              )}
-
-              {!withinLimit && (
-                <motion.div 
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="p-3 bg-[#E34234]/10 border border-[#E34234]/30 rounded-lg flex items-center gap-2"
-                >
-                  <AlertCircle className="w-4 h-4 text-[#E34234]" />
-                  <p className="text-sm text-[#E34234] font-medium">
-                    ⚠️ This bet would give you too many contracts. Maximum: {remainingCapacity} more contracts allowed.
-                  </p>
-                </motion.div>
-              )}
-            </>
-          )}
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-4 text-[#4E3629]/60">
+                <p className="text-sm">Sign in to see prediction details</p>
+              </div>
+            )}
+          </motion.div>
 
           {/* Order Buttons */}
           <div className={`flex gap-3 pt-2 ${
@@ -802,14 +775,14 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
           }`}>
             <Button
               onClick={() => openConfirmDialog('buy')}
-              disabled={isSubmitting || !canTrade || !betAmount || numBetAmount === 0 || numQuantity === 0 || !hasEnoughCash || !withinLimit || market?.status === 'resolved'}
+              disabled={isSubmitting || !canTrade || !quantity || numQuantity === 0 || !hasEnoughCash || !withinLimit || market?.status === 'resolved'}
               className="flex-1 bg-[#50C878] hover:bg-[#3FA963] text-white font-semibold py-6 rounded-xl shadow-lg disabled:bg-gray-300 disabled:shadow-none"
             >
               {market?.status === 'resolved' ? 'MARKET RESOLVED' : `BUY ${selectedOutcome.toUpperCase()}`}
             </Button>
             <Button
               onClick={() => openConfirmDialog('sell')}
-              disabled={isSubmitting || !canTrade || !betAmount || numBetAmount === 0 || numQuantity === 0 || availableShares < numQuantity || market?.status === 'resolved'}
+              disabled={isSubmitting || !canTrade || !quantity || numQuantity === 0 || availableShares < numQuantity || market?.status === 'resolved'}
               className="flex-1 bg-[#E34234] hover:bg-[#C93529] text-white font-semibold py-6 rounded-xl shadow-lg disabled:bg-gray-300 disabled:shadow-none"
             >
               {market?.status === 'resolved' ? 'MARKET RESOLVED' : `SELL ${selectedOutcome.toUpperCase()}`}
@@ -860,31 +833,31 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
           <div className="my-6 space-y-4">
             <div className="bg-gradient-to-r from-[#FAF3E0] to-[#F5EED8] p-4 rounded-xl border border-[#A97142]/30">
               <p className="text-[#4E3629] font-semibold mb-2">
-                You're betting <span className={selectedOutcome === 'yes' ? 'text-[#50C878]' : 'text-[#E34234]'}>{selectedOutcome.toUpperCase()}</span> with {probability}% confidence
+                You're predicting <span className={selectedOutcome === 'yes' ? 'text-[#50C878]' : 'text-[#E34234]'}>{selectedOutcome.toUpperCase()}</span> with {probability}% confidence
               </p>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-[#4E3629]/60">Your bet:</p>
-                  <p className="font-bold text-[#4E3629]">${numBetAmount.toFixed(2)}</p>
-                </div>
                 <div>
                   <p className="text-[#4E3629]/60">Contracts:</p>
                   <p className="font-bold text-[#4E3629]">{numQuantity}</p>
                 </div>
                 <div>
                   <p className="text-[#4E3629]/60">Cost:</p>
-                  <p className="font-bold text-[#4E3629]">${actualCost}</p>
+                  <p className="font-bold text-[#4E3629]">${cost}</p>
                 </div>
                 <div>
-                  <p className="text-[#4E3629]/60">Fees:</p>
+                  <p className="text-[#4E3629]/60">Estimated Fees:</p>
                   <p className="font-bold text-[#4E3629]">${estimatedFee.toFixed(2)}</p>
                 </div>
                 <div>
-                  <p className="text-[#4E3629]/60">If you win:</p>
+                  <p className="text-[#4E3629]/60">Total Pay Now:</p>
+                  <p className="font-bold text-[#4E3629]">${(parseFloat(cost) + estimatedFee).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-[#4E3629]/60">Potential Payout:</p>
                   <p className="font-bold text-[#50C878]">${potentialPayout}</p>
                 </div>
                 <div>
-                  <p className="text-[#4E3629]/60">Your profit:</p>
+                  <p className="text-[#4E3629]/60">Expected Profit:</p>
                   <p className={`font-bold ${parseFloat(expectedProfit) >= 0 ? 'text-[#50C878]' : 'text-[#E34234]'}`}>
                     {parseFloat(expectedProfit) >= 0 ? '+' : ''}${expectedProfit}
                   </p>
@@ -893,9 +866,9 @@ export default function TradeWidget({ market, user, onOrderPlaced, selectedOutco
             </div>
 
             <div className="text-xs text-[#4E3629]/60 space-y-1">
-              <p>• You will pay ${(parseFloat(actualCost) + estimatedFee).toFixed(2)} now (including fees)</p>
+              <p>• You will pay ${(parseFloat(cost) + estimatedFee).toFixed(2)} now (including estimated fees)</p>
               <p>• If {selectedOutcome.toUpperCase()} wins, you'll receive ${potentialPayout}</p>
-              <p>• If {selectedOutcome.toUpperCase()} loses, you'll lose your ${actualCost}</p>
+              <p>• If {selectedOutcome.toUpperCase()} loses, you'll receive $0</p>
             </div>
           </div>
 
